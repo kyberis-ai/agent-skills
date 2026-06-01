@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const PACKAGE_NAME = "@kyberis-ai/agent-skills";
 const SKILL_NAME = "kyberis";
-const AGENTS = new Set(["codex", "claude", "cursor"]);
+const AGENTS = new Set(["codex", "claude", "cursor", "windsurf"]);
 const __filename = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(__filename), "..");
 const sourceRoot = path.join(packageRoot, "source");
@@ -15,6 +15,7 @@ const defaultInstallDirs = {
   codex: path.join(os.homedir(), ".codex", "skills", SKILL_NAME),
   claude: path.join(os.homedir(), ".claude", "skills", SKILL_NAME),
   cursor: path.join(os.homedir(), ".cursor", "skills", SKILL_NAME),
+  windsurf: path.join(os.homedir(), ".codeium", "windsurf", "skills", SKILL_NAME),
 };
 
 const defaultCursorRuleFile = path.join(os.homedir(), ".cursor", "rules", `${SKILL_NAME}.mdc`);
@@ -23,15 +24,16 @@ const repoSkillDirs = {
   codex: path.join(".codex", "skills", SKILL_NAME),
   claude: path.join(".claude", "skills", SKILL_NAME),
   cursor: path.join(".cursor", "skills", SKILL_NAME),
+  windsurf: path.join(".windsurf", "skills", SKILL_NAME),
 };
 
 const repoCursorRuleFile = path.join(".cursor", "rules", `${SKILL_NAME}.mdc`);
 
 function usage() {
   return `Usage:
-  kyberis-agent-skills install <codex|claude|cursor> [--dir <path>] [--force]
+  kyberis-agent-skills install <codex|claude|cursor|windsurf> [--dir <path>] [--force]
   kyberis-agent-skills update [--force]
-  kyberis-agent-skills status [codex|claude|cursor] [--dir <path>]
+  kyberis-agent-skills status [codex|claude|cursor|windsurf] [--dir <path>]
   kyberis-agent-skills sync
   kyberis-agent-skills check
   kyberis-agent-skills --help

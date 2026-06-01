@@ -7,7 +7,7 @@ import test from "node:test";
 import { internals, main } from "../src/cli.mjs";
 
 test("bundle contains shared api reference and manifest for every agent", () => {
-  for (const agent of ["codex", "claude", "cursor"]) {
+  for (const agent of ["codex", "claude", "cursor", "windsurf"]) {
     const bundle = internals.bundleForAgent(agent);
     assert.equal(bundle.manifest.package, "@kyberis-ai/agent-skills");
     assert.equal(bundle.manifest.agent, agent);
@@ -15,6 +15,16 @@ test("bundle contains shared api reference and manifest for every agent", () => 
     assert.ok(bundle.files.has("references/api-reference.md"));
     assert.ok(String(bundle.files.get("references/api-reference.md")).includes("/v2/"));
   }
+});
+
+test("windsurf bundle uses cascade skill metadata for threat investigation", () => {
+  const bundle = internals.bundleForAgent("windsurf");
+  assert.ok(bundle.files.has("SKILL.md"));
+  const skill = String(bundle.files.get("SKILL.md"));
+  assert.ok(skill.includes("Guides Windsurf Cascade"));
+  assert.ok(skill.includes("https://mcp.kyberis.ai/"));
+  assert.ok(skill.includes("@kyberis"));
+  assert.ok(skill.includes("Do not apply it to general source code editing"));
 });
 
 test("cursor bundle includes an agent-requested rule for threat investigation", () => {
@@ -56,9 +66,9 @@ test("install refuses to overwrite unmanaged existing directory unless forced", 
 
 test("install command supports custom directory", async () => {
   const target = fs.mkdtempSync(path.join(os.tmpdir(), "kyberis-install-"));
-  await main(["install", "cursor", "--dir", target]);
+  await main(["install", "windsurf", "--dir", target]);
   const manifest = internals.readManifest(target);
-  assert.equal(manifest.agent, "cursor");
+  assert.equal(manifest.agent, "windsurf");
   assert.equal(manifest.package, "@kyberis-ai/agent-skills");
   assert.ok(manifest.installedAt);
 });

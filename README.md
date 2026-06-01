@@ -1,6 +1,6 @@
 # @kyberis-ai/agent-skills
 
-Installer and canonical source for Kyberis agent skills for Codex, Claude, and Cursor.
+Installer and canonical source for Kyberis agent skills for Codex, Claude, Cursor, and Windsurf.
 
 ## Install a skill
 
@@ -8,13 +8,15 @@ Installer and canonical source for Kyberis agent skills for Codex, Claude, and C
 npx -y @kyberis-ai/agent-skills install codex
 npx -y @kyberis-ai/agent-skills install claude
 npx -y @kyberis-ai/agent-skills install cursor
+npx -y @kyberis-ai/agent-skills install windsurf
 ```
 
 The installer writes the Kyberis skill into the agent's local skill directory:
 
 - Codex: `~/.codex/skills/kyberis`
 - Claude: `~/.claude/skills/kyberis`
-- Cursor: `~/.cursor/skills/kyberis`
+- Cursor: `~/.cursor/skills/kyberis` plus `~/.cursor/rules/kyberis.mdc` for automatic Agent selection
+- Windsurf: `~/.codeium/windsurf/skills/kyberis`
 
 Use `--dir <path>` to install to a custom directory.
 
@@ -29,14 +31,14 @@ npx -y @kyberis-ai/agent-skills@latest update
 ## Commands
 
 ```bash
-kyberis-agent-skills install <codex|claude|cursor> [--dir <path>] [--force]
+kyberis-agent-skills install <codex|claude|cursor|windsurf> [--dir <path>] [--force]
 kyberis-agent-skills update [--force]
-kyberis-agent-skills status [codex|claude|cursor] [--dir <path>]
+kyberis-agent-skills status [codex|claude|cursor|windsurf] [--dir <path>]
 kyberis-agent-skills sync
 kyberis-agent-skills check
 ```
 
-`sync` and `check` are repository maintenance commands. They keep `.codex/skills/kyberis`, `.claude/skills/kyberis`, and `.cursor/skills/kyberis` in sync with this package's canonical source.
+`sync` and `check` are repository maintenance commands. They keep `.codex/skills/kyberis`, `.claude/skills/kyberis`, `.cursor/skills/kyberis`, `.cursor/rules/kyberis.mdc`, and `.windsurf/skills/kyberis` in sync with this package's canonical source.
 
 ## Runtime setup
 

@@ -1,7 +1,7 @@
 {
   "name": "@kyberis-ai/agent-skills",
   "version": "0.1.0",
-  "description": "Installer and canonical source for Kyberis agent skills for Codex, Claude, and Cursor",
+  "description": "Installer and canonical source for Kyberis agent skills for Codex, Claude, Cursor, and Windsurf",
   "type": "module",
   "bin": {
     "kyberis-agent-skills": "./bin/kyberis-agent-skills.mjs"
@@ -24,6 +24,7 @@
     "codex",
     "claude",
     "cursor",
+    "windsurf",
     "threat-intelligence"
   ],
   "engines": {
