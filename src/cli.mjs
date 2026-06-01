@@ -204,11 +204,24 @@ function writeBundle(targetDir, bundle, { force = false, installMode = false } =
   }
 }
 
+function isStandalonePackageRoot(dir) {
+  const packageJson = path.join(dir, "package.json");
+  if (!fs.existsSync(packageJson)) return false;
+  try {
+    const data = JSON.parse(fs.readFileSync(packageJson, "utf8"));
+    return data.name === PACKAGE_NAME && fs.existsSync(path.join(dir, "source"));
+  } catch {
+    return false;
+  }
+}
+
 function findRepoRoot(start = process.cwd()) {
   let dir = path.resolve(start);
   while (true) {
-    if (fs.existsSync(path.join(dir, ".git")) && fs.existsSync(path.join(dir, "packages", "agent-skills"))) {
-      return dir;
+    if (fs.existsSync(path.join(dir, ".git"))) {
+      if (fs.existsSync(path.join(dir, "packages", "agent-skills")) || isStandalonePackageRoot(dir)) {
+        return dir;
+      }
     }
     const parent = path.dirname(dir);
     if (parent === dir) throw new Error("Could not locate repository root");

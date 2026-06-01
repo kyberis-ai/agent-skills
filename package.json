@@ -38,11 +38,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GenLab-Studios/threat-investigator.git",
-    "directory": "packages/agent-skills"
+    "url": "git+https://github.com/kyberis-ai/agent-skills.git"
   },
   "bugs": {
-    "url": "https://github.com/GenLab-Studios/threat-investigator/issues"
+    "url": "https://github.com/kyberis-ai/agent-skills/issues"
   },
-  "homepage": "https://github.com/GenLab-Studios/threat-investigator/tree/main/packages/agent-skills"
+  "homepage": "https://github.com/kyberis-ai/agent-skills#readme"
 }

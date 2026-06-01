@@ -1,0 +1,15 @@
+interface:
+  display_name: "Kyberis"
+  short_description: "Investigate threats with Kyberis"
+  icon_small: "./assets/kyberis-small.png"
+  icon_large: "./assets/kyberis.png"
+  brand_color: "#0F766E"
+  default_prompt: "Use $kyberis to investigate this threat with evidence-backed findings and next actions."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "kyberis"
+      description: "Kyberis MCP server"
+      transport: "streamable_http"
+      url: "https://mcp.kyberis.ai/"
