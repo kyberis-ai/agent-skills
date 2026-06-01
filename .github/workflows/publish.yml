@@ -13,7 +13,7 @@ jobs:
   publish:
     name: Stage npm package
     runs-on: ubuntu-latest
-    environment: npm-publish
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
