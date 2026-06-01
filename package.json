@@ -4,7 +4,7 @@
   "description": "Installer and canonical source for Kyberis agent skills for Codex, Claude, Cursor, Windsurf, and generic agents",
   "type": "module",
   "bin": {
-    "kyberis-agent-skills": "./bin/kyberis-agent-skills.mjs"
+    "kyberis-agent-skills": "bin/kyberis-agent-skills.mjs"
   },
   "scripts": {
     "sync": "node ./bin/kyberis-agent-skills.mjs sync",
