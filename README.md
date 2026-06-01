@@ -60,3 +60,20 @@ export KYBERIS_BASE_URL="https://api.kyberis.ai"
 export KYBERIS_API_KEY_ID="<key_id>"
 export KYBERIS_API_KEY_SECRET="<secret>"
 ```
+
+## Contributing
+
+Issues and pull requests are welcome.
+
+This repository contains the canonical source for the Kyberis agent skill installer and generated skill bundles. When changing skill content, edit files under `source/` first, then run:
+
+```bash
+npm run sync
+npm run check
+npm test
+npm pack --dry-run
+```
+
+Generated skill directories such as `.codex/`, `.claude/`, `.cursor/`, and `.windsurf/` should stay in sync with `source/`.
+
+By contributing, you agree that your contributions are licensed under the Apache License 2.0.
