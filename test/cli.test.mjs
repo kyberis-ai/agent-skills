@@ -22,7 +22,11 @@ test("codex bundle preserves executable helper and OpenAI metadata overlays", ()
   assert.ok(bundle.files.has("agents/openai.yaml"));
   const openaiYaml = String(bundle.files.get("agents/openai.yaml"));
   assert.ok(openaiYaml.includes("$kyberis"));
+  assert.ok(openaiYaml.includes("./assets/kyberis-small.png"));
+  assert.ok(openaiYaml.includes("./assets/kyberis.png"));
   assert.ok(openaiYaml.includes("https://mcp.kyberis.ai/"));
+  assert.ok(bundle.files.has("assets/kyberis-small.png"));
+  assert.ok(bundle.files.has("assets/kyberis.png"));
   assert.ok(bundle.files.has("bin/kyberis-client.mjs"));
   assert.ok(bundle.files.has("package.json"));
   assert.ok(!bundle.files.has("references/api-contract.md"));
