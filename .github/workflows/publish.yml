@@ -11,9 +11,9 @@ permissions:
 
 jobs:
   publish:
-    name: Publish to npm
+    name: Stage npm package
     runs-on: ubuntu-latest
-    environment: npm-publish
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
@@ -26,4 +26,4 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm pack --dry-run
-      - run: npm publish --access public
+      - run: npm stage publish --access public
