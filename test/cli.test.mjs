@@ -17,8 +17,12 @@ test("bundle contains shared api reference and manifest for every agent", () => 
   }
 });
 
-test("codex bundle preserves executable helper overlay", () => {
+test("codex bundle preserves executable helper and OpenAI metadata overlays", () => {
   const bundle = internals.bundleForAgent("codex");
+  assert.ok(bundle.files.has("agents/openai.yaml"));
+  const openaiYaml = String(bundle.files.get("agents/openai.yaml"));
+  assert.ok(openaiYaml.includes("$kyberis"));
+  assert.ok(openaiYaml.includes("https://mcp.kyberis.ai/"));
   assert.ok(bundle.files.has("bin/kyberis-client.mjs"));
   assert.ok(bundle.files.has("package.json"));
   assert.ok(!bundle.files.has("references/api-contract.md"));
