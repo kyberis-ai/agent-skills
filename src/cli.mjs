@@ -224,7 +224,7 @@ function findRepoRoot(start = process.cwd()) {
       }
     }
     const parent = path.dirname(dir);
-    if (parent === dir) throw new Error("Could not locate repository root");
+    if (parent === dir) throw new Error("Could not locate the @kyberis-ai/agent-skills repository root");
     dir = parent;
   }
 }
@@ -323,7 +323,7 @@ function checkRepo() {
   if (mismatches.length) {
     console.error("Generated Kyberis skill files are out of sync:");
     for (const item of mismatches) console.error(`  ${item}`);
-    console.error("Run: cd packages/agent-skills && npm run sync");
+    console.error("Run: npm run sync");
     process.exitCode = 1;
     return;
   }
