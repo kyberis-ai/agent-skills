@@ -1,6 +1,6 @@
 # @kyberis-ai/agent-skills
 
-Installer and canonical source for Kyberis agent skills for Codex, Claude, Cursor, and Windsurf.
+Installer and canonical source for Kyberis agent skills for Codex, Claude, Cursor, Windsurf, and generic agents.
 
 ## Install a skill
 
@@ -9,6 +9,7 @@ npx -y @kyberis-ai/agent-skills install codex
 npx -y @kyberis-ai/agent-skills install claude
 npx -y @kyberis-ai/agent-skills install cursor
 npx -y @kyberis-ai/agent-skills install windsurf
+npx -y @kyberis-ai/agent-skills install generic --dir ./kyberis-agent-skill
 ```
 
 The installer writes the Kyberis skill into the agent's local skill directory:
@@ -17,8 +18,17 @@ The installer writes the Kyberis skill into the agent's local skill directory:
 - Claude: `~/.claude/skills/kyberis`
 - Cursor: `~/.cursor/skills/kyberis` plus `~/.cursor/rules/kyberis.mdc` for automatic Agent selection
 - Windsurf: `~/.codeium/windsurf/skills/kyberis`
+- Generic: the directory passed with `--dir`
 
-Use `--dir <path>` to install to a custom directory.
+Use `--dir <path>` to install to a custom directory. Generic installs require `--dir` because unsupported agents do not share a standard skill path.
+
+## Generic agents
+
+For agents that are not directly supported, install the generic bundle and then point the agent at the generated folder or import its `SKILL.md` and `references/api-reference.md` files according to that agent's custom instruction mechanism.
+
+```bash
+npx -y @kyberis-ai/agent-skills install generic --dir ./kyberis-agent-skill
+```
 
 ## Update installed skills
 
@@ -32,8 +42,9 @@ npx -y @kyberis-ai/agent-skills@latest update
 
 ```bash
 kyberis-agent-skills install <codex|claude|cursor|windsurf> [--dir <path>] [--force]
+kyberis-agent-skills install generic --dir <path> [--force]
 kyberis-agent-skills update [--force]
-kyberis-agent-skills status [codex|claude|cursor|windsurf] [--dir <path>]
+kyberis-agent-skills status [codex|claude|cursor|windsurf|generic] [--dir <path>]
 kyberis-agent-skills sync
 kyberis-agent-skills check
 ```

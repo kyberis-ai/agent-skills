@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const PACKAGE_NAME = "@kyberis-ai/agent-skills";
 const SKILL_NAME = "kyberis";
-const AGENTS = new Set(["codex", "claude", "cursor", "windsurf"]);
+const AGENTS = new Set(["codex", "claude", "cursor", "windsurf", "generic"]);
 const __filename = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(__filename), "..");
 const sourceRoot = path.join(packageRoot, "source");
@@ -32,8 +32,9 @@ const repoCursorRuleFile = path.join(".cursor", "rules", `${SKILL_NAME}.mdc`);
 function usage() {
   return `Usage:
   kyberis-agent-skills install <codex|claude|cursor|windsurf> [--dir <path>] [--force]
+  kyberis-agent-skills install generic --dir <path> [--force]
   kyberis-agent-skills update [--force]
-  kyberis-agent-skills status [codex|claude|cursor|windsurf] [--dir <path>]
+  kyberis-agent-skills status [codex|claude|cursor|windsurf|generic] [--dir <path>]
   kyberis-agent-skills sync
   kyberis-agent-skills check
   kyberis-agent-skills --help
@@ -217,6 +218,9 @@ function findRepoRoot(start = process.cwd()) {
 
 function install(agent, options) {
   assertAgent(agent);
+  if (agent === "generic" && !options.dir) {
+    throw new Error("generic installs require --dir <path>");
+  }
   const target = path.resolve(options.dir || defaultInstallDirs[agent]);
   const bundle = bundleForAgent(agent, { installedAt: new Date().toISOString() });
   writeBundle(target, bundle, { force: options.force, installMode: true });
@@ -229,6 +233,10 @@ function install(agent, options) {
 
 function status(agent, options) {
   assertAgent(agent);
+  if (agent === "generic" && !options.dir) {
+    console.log("generic: provide --dir <path> to inspect a generic installation");
+    return false;
+  }
   const target = path.resolve(options.dir || defaultInstallDirs[agent]);
   const manifest = readManifest(target);
   if (!manifest) {
@@ -245,6 +253,7 @@ function status(agent, options) {
 function updateAll(options) {
   let installed = 0;
   for (const agent of AGENTS) {
+    if (agent === "generic") continue;
     const target = path.resolve(defaultInstallDirs[agent]);
     const manifest = readManifest(target);
     if (!manifest || manifest.package !== PACKAGE_NAME || manifest.skill !== SKILL_NAME) continue;
@@ -257,6 +266,7 @@ function updateAll(options) {
 function syncRepo() {
   const repoRoot = findRepoRoot();
   for (const agent of AGENTS) {
+    if (!repoSkillDirs[agent]) continue;
     const target = path.join(repoRoot, repoSkillDirs[agent]);
     const bundle = bundleForAgent(agent);
     writeBundle(target, bundle, { force: true });
@@ -273,6 +283,7 @@ function checkRepo() {
   const repoRoot = findRepoRoot();
   const mismatches = [];
   for (const agent of AGENTS) {
+    if (!repoSkillDirs[agent]) continue;
     const target = path.join(repoRoot, repoSkillDirs[agent]);
     const expected = bundleForAgent(agent);
     if (agent === "cursor") {
