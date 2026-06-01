@@ -1,0 +1,13 @@
+{
+  "name": "@kyberis/client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kyberis API helper for the Codex Kyberis skill",
+  "type": "module",
+  "bin": {
+    "kyberis-client": "./bin/kyberis-client.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
