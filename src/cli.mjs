@@ -17,11 +17,15 @@ const defaultInstallDirs = {
   cursor: path.join(os.homedir(), ".cursor", "skills", SKILL_NAME),
 };
 
+const defaultCursorRuleFile = path.join(os.homedir(), ".cursor", "rules", `${SKILL_NAME}.mdc`);
+
 const repoSkillDirs = {
   codex: path.join(".codex", "skills", SKILL_NAME),
   claude: path.join(".claude", "skills", SKILL_NAME),
   cursor: path.join(".cursor", "skills", SKILL_NAME),
 };
+
+const repoCursorRuleFile = path.join(".cursor", "rules", `${SKILL_NAME}.mdc`);
 
 function usage() {
   return `Usage:
@@ -119,6 +123,24 @@ function bundleForAgent(agent, { installedAt = null } = {}) {
   return { files, hash, manifest };
 }
 
+function cursorRuleFromBundle(bundle) {
+  const rule = bundle.files.get("rules/kyberis.mdc");
+  if (!rule) throw new Error("Cursor bundle is missing rules/kyberis.mdc");
+  return rule;
+}
+
+function writeCursorRule(ruleFile, bundle, { force = false } = {}) {
+  const body = cursorRuleFromBundle(bundle);
+  if (!force && fs.existsSync(ruleFile)) {
+    const existing = fs.readFileSync(ruleFile);
+    if (!Buffer.from(existing).equals(Buffer.from(body))) {
+      throw new Error(`${ruleFile} already exists and differs from the Kyberis Cursor rule. Use --force to overwrite.`);
+    }
+  }
+  fs.mkdirSync(path.dirname(ruleFile), { recursive: true });
+  fs.writeFileSync(ruleFile, body);
+}
+
 function currentFiles(targetDir) {
   const files = new Map();
   for (const file of walkFiles(targetDir)) {
@@ -197,6 +219,10 @@ function install(agent, options) {
   const bundle = bundleForAgent(agent, { installedAt: new Date().toISOString() });
   writeBundle(target, bundle, { force: options.force, installMode: true });
   console.log(`Installed Kyberis ${agent} skill to ${target}`);
+  if (agent === "cursor" && (!options.dir || target === path.resolve(defaultInstallDirs.cursor))) {
+    writeCursorRule(defaultCursorRuleFile, bundle, { force: options.force });
+    console.log(`Installed Kyberis Cursor rule to ${defaultCursorRuleFile}`);
+  }
 }
 
 function status(agent, options) {
@@ -230,8 +256,14 @@ function syncRepo() {
   const repoRoot = findRepoRoot();
   for (const agent of AGENTS) {
     const target = path.join(repoRoot, repoSkillDirs[agent]);
-    writeBundle(target, bundleForAgent(agent), { force: true });
+    const bundle = bundleForAgent(agent);
+    writeBundle(target, bundle, { force: true });
     console.log(`Synced ${agent} skill to ${path.relative(repoRoot, target)}`);
+    if (agent === "cursor") {
+      const ruleFile = path.join(repoRoot, repoCursorRuleFile);
+      writeCursorRule(ruleFile, bundle, { force: true });
+      console.log(`Synced cursor rule to ${path.relative(repoRoot, ruleFile)}`);
+    }
   }
 }
 
@@ -241,6 +273,12 @@ function checkRepo() {
   for (const agent of AGENTS) {
     const target = path.join(repoRoot, repoSkillDirs[agent]);
     const expected = bundleForAgent(agent);
+    if (agent === "cursor") {
+      const ruleFile = path.join(repoRoot, repoCursorRuleFile);
+      if (!fs.existsSync(ruleFile) || !Buffer.from(fs.readFileSync(ruleFile)).equals(Buffer.from(cursorRuleFromBundle(expected)))) {
+        mismatches.push(`cursor:${repoCursorRuleFile}`);
+      }
+    }
     const existing = currentFiles(target);
     const existingWithManifest = new Map(existing);
     const manifest = readManifest(target);
@@ -298,4 +336,5 @@ export const internals = {
   readManifest,
   status,
   writeBundle,
+  writeCursorRule,
 };

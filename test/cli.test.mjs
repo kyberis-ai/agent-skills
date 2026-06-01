@@ -17,6 +17,16 @@ test("bundle contains shared api reference and manifest for every agent", () => 
   }
 });
 
+test("cursor bundle includes an agent-requested rule for threat investigation", () => {
+  const bundle = internals.bundleForAgent("cursor");
+  assert.ok(bundle.files.has("rules/kyberis.mdc"));
+  const rule = String(bundle.files.get("rules/kyberis.mdc"));
+  assert.ok(rule.includes("alwaysApply: false"));
+  assert.ok(rule.includes("https://mcp.kyberis.ai/"));
+  assert.ok(rule.includes("threat investigation"));
+  assert.ok(rule.includes("Do not apply Kyberis to general source code editing"));
+});
+
 test("codex bundle preserves executable helper and OpenAI metadata overlays", () => {
   const bundle = internals.bundleForAgent("codex");
   assert.ok(bundle.files.has("agents/openai.yaml"));

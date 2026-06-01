@@ -13,9 +13,11 @@ Keep this file focused on workflow and failure handling. Load `references/api-re
 
 When working in Cursor Agent mode, prefer the configured Kyberis MCP server if available. Do not invent Kyberis results. If Kyberis is unavailable, tell the user what context is missing and suggest the exact MCP/API setup step.
 
+Use this skill only for Kyberis or security investigation tasks. Do not apply it to general source code editing, refactoring, implementation, or repository maintenance unless the user's request is security-investigation related.
+
 Setup guidance to provide when needed:
 
-- MCP path: configure and enable the Kyberis MCP server, then retry the investigation using MCP tools.
+- MCP path: configure and enable the Kyberis MCP server at `https://mcp.kyberis.ai/`, then retry the investigation using MCP tools.
 - API fallback: set `KYBERIS_BASE_URL`, `KYBERIS_API_KEY_ID`, and `KYBERIS_API_KEY_SECRET`, then use the documented `/v2/*` API flow.
 
 Never fabricate evidence, relationships, assessment scores, or recommendations as if they came from Kyberis.
