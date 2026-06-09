@@ -27,9 +27,10 @@ Use this sequence unless the user asks for a narrower path.
 - Raw entity or indicator: start with `entity-resolution`. Examples: CVE, IP, domain, URL, hash, actor alias, malware name.
 - Broad topic or news question: start with `intel-search`, then resolve material entities before evidence and assessment.
 - Environment or posture question: start with `prioritize` or `environment-assessments`, then validate top findings with evidence and relationships.
+- Hunt-next-step question: use `hunt-pivots` when the user has weak telemetry or wants next investigative actions, then execute the returned query intent in customer telemetry.
 - Batch request: use the matching batch endpoint for many independent items, preserve per-item success/failure, and avoid mixing failed items into aggregate recommendations.
 
-Natural user phrasing that should trigger this skill includes `look up evidence`, `resolve this entity`, `find relationships`, `what should we patch`, `is this IOC malicious`, `investigate this CVE`, `prioritize threats for this environment`, `Kyberis lookup`, and `Kyberis API query`.
+Natural user phrasing that should trigger this skill includes `look up evidence`, `resolve this entity`, `find relationships`, `what should we hunt next`, `what should we patch`, `is this IOC malicious`, `investigate this CVE`, `prioritize threats for this environment`, `Kyberis lookup`, and `Kyberis API query`.
 
 ## Endpoint Selection
 
@@ -43,6 +44,7 @@ Natural user phrasing that should trigger this skill includes `look up evidence`
 - `POST /v2/environment-assessments`: use when the question is about a customer's environment, exposure, controls, or security posture.
 - `POST /v2/threat-assessments`: use when subject class is mixed, uncertain, or not covered by a specialized assessment.
 - `POST /v2/prioritize`: use when the user provides environment context and asks what matters now.
+- `POST /v2/hunt-pivots`: use when the agent needs ranked next investigative actions for a resolved subject or weak observation.
 - Batch endpoints: use for bounded sets of independent resolution, evidence, relationship, or assessment requests.
 
 ## Required Request Rules

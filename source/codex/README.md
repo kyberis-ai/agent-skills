@@ -22,7 +22,7 @@ export KYBERIS_MAX_RETRIES="2"
 5. Produce recommendation with confidence, caveats, and next actions.
 
 For broad discovery, start with `intel-search`, then pivot to resolution/evidence/relationships/assessment.
-For environment triage, start with `prioritize`, then investigate top-ranked signals.
+For environment triage, start with `prioritize`, then investigate top-ranked signals. For weak telemetry or next-step hunt planning, use `hunt-pivots`.
 
 ## Command Usage
 

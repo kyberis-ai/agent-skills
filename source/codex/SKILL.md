@@ -172,6 +172,7 @@ Supported wrappers:
 - `relationships`
 - `intel-search`
 - `prioritize`
+- `hunt-pivots`
 
 Use `node .codex/skills/kyberis/bin/kyberis-client.mjs --help` for command syntax.
 

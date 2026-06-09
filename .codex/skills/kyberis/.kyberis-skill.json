@@ -1,7 +1,7 @@
 {
   "package": "@kyberis-ai/agent-skills",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "skill": "kyberis",
   "agent": "codex",
-  "contentHash": "sha256:816c8e1dd49031acff5e9e18d059626fd237826aa94ef55e457c2da125fee3bd"
+  "contentHash": "sha256:7435ca86f9472fe382a163cd6639dcef39f85365ac5bb14c2e87faf44081f9a4"
 }

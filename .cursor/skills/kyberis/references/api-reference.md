@@ -48,14 +48,14 @@ ask the user to provide them.
 ## Required envelope: agent_context
 
 Every agent endpoint (evidence, resolution, assessments, relationships,
-prioritize, and batches) requires an `agent_context` block on the request
+prioritize, hunt pivots, and batches) requires an `agent_context` block on the request
 body. Minimum fields:
 
 ```bash
 # agent_context envelope (required on every agent endpoint)
 # objective:         human-readable goal (8-280 chars)
 # requested_outcome: what you want back (3-280 chars)
-# workflow_stage:    resolve, evidence, relationships, assessment, hydrate, batch, finalize, or other
+# workflow_stage:    resolve, evidence, relationships, assessment, hunt, hydrate, batch, finalize, or other
 # run_id:           stable id for this run (4-64 chars)
 # step_id:          id for this step (1-64 chars)
 ```
@@ -95,6 +95,10 @@ These are not callable with an ApiKey header. Skip them in agent flows.
 ### Prioritize
 
 - `POST /v2/prioritize` - scope `read:prioritize`, environment-aware ranking
+
+### Hunt Pivots
+
+- `POST /v2/hunt-pivots` - scope `read:hunt_pivots`, ranked subject-led or observation-led hunt recommendations, 8 credits
 
 ### Structured Assessments
 
@@ -143,6 +147,10 @@ These are not callable with an ApiKey header. Skip them in agent flows.
 - `POST /v2/prioritize`
   - When: user provides environment context and asks what matters now.
   - Why: ranked queue for action, then deep-dive top items with evidence + relationships.
+
+- `POST /v2/hunt-pivots`
+  - When: an agent needs ranked next investigative actions for a resolved subject or weak observation.
+  - Why: returns vendor-neutral hunt questions, query intent, rationale, confidence, required telemetry fields, and caveats. Use `relationships` instead for graph-neighbor lookup only.
 
 ## Subject vs Query mode
 
@@ -288,6 +296,33 @@ The `environment` object requires at least one context field.
 expected_categories values: `vulnerability`, `campaign`, `actor_activity`,
 `malware_activity`, `ioc_cluster`, `technique_cluster`, `identity_abuse`,
 `vendor_risk_cluster`.
+
+### Hunt pivots
+
+```bash
+curl -s -X POST "$KYBERIS_BASE_URL/v2/hunt-pivots" \
+  -H "Authorization: ApiKey $KYBERIS_API_KEY_ID:$KYBERIS_API_KEY_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_context": {"objective": "Recommend pivots for rare outbound egress",
+                      "requested_outcome": "ranked hunt actions",
+                      "workflow_stage": "hunt",
+                      "run_id": "run-004", "step_id": "step-hunt-1"},
+    "subject": null,
+    "observed": {
+      "iocs": [{"type": "ip", "value": "203.0.113.10",
+                "role": "egress_destination", "resolution_status": "unresolved"}],
+      "anomaly_summary": "Unusual outbound HTTPS from a production server to a rare external IP",
+      "telemetry_context": {"source_asset_role": "production_server",
+                            "protocol": "https", "direction": "egress"}
+    },
+    "environment_context": {"sector": "technology", "internet_exposure": "high"},
+    "options": {"max_pivots": 10, "include_attack_chains": true}
+  }' | jq .
+```
+
+Use `hunt-pivots` for ranked investigative actions. Use `relationships` when
+you only need related entities for a resolved subject.
 
 ### Threat / CVE / Actor / IOC assessments
 
