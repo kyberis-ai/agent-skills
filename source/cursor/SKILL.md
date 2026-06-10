@@ -41,9 +41,10 @@ Use this sequence unless the user asks for a narrower path.
 - Raw entity or indicator: start with entity resolution. Examples: CVE, IP, domain, URL, hash, actor alias, malware name.
 - Broad topic or news question: start with intel search, then resolve material entities before evidence and assessment.
 - Environment or posture question: start with prioritization or environment assessment, then validate top findings with evidence and relationships.
+- Hunt-next-step question: use hunt pivots when the user has weak telemetry or wants next investigative actions, then execute the returned query intent in customer telemetry.
 - Batch request: use matching batch-capable MCP/API tools for many independent items, preserve per-item success/failure, and avoid mixing failed items into aggregate recommendations.
 
-Natural user phrasing that should trigger this skill includes `Kyberis lookup`, `Kyberis API query`, `threat lookup`, `look up evidence`, `resolve entities`, `find relationships`, `is this IOC malicious`, `investigate this CVE`, `prioritize threats for this environment`, `incident investigation`, `security investigation`, and `remediation guidance`.
+Natural user phrasing that should trigger this skill includes `Kyberis lookup`, `Kyberis API query`, `threat lookup`, `look up evidence`, `resolve entities`, `find relationships`, `what should we hunt next`, `is this IOC malicious`, `investigate this CVE`, `prioritize threats for this environment`, `incident investigation`, `security investigation`, and `remediation guidance`.
 
 ## Tool And Endpoint Selection
 
@@ -57,6 +58,7 @@ Natural user phrasing that should trigger this skill includes `Kyberis lookup`, 
 - `environment-assessments`: use when the question is about a customer's environment, exposure, controls, or security posture.
 - `threat-assessments`: use when subject class is mixed, uncertain, or not covered by a specialized assessment.
 - `prioritize`: use when the user provides environment context and asks what matters now.
+- `hunt-pivots`: use when the agent needs ranked next investigative actions for a resolved subject or weak observation.
 - Batch tools/endpoints: use for bounded sets of independent resolution, evidence, relationship, or assessment requests.
 
 ## Required Request Rules

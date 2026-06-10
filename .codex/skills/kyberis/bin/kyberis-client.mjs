@@ -8,6 +8,7 @@ const ALLOWED_COMMANDS = {
   "claim-evidence": "/v2/evidence",
   "relationships": "/v2/relationships",
   "prioritize": "/v2/prioritize",
+  "hunt-pivots": "/v2/hunt-pivots",
   "intel-search": "/v2/intel-search"
 };
 
@@ -17,6 +18,7 @@ const WORKFLOW_STAGES = new Set([
   "evidence",
   "relationships",
   "assessment",
+  "hunt",
   "hydrate",
   "batch",
   "finalize",
@@ -315,6 +317,21 @@ function boundedPayload(command, payload) {
     }
     if (Object.hasOwn(data, "max_items")) {
       data.max_items = clamp(data.max_items, 1, 100);
+    }
+  }
+  if (command === "hunt-pivots") {
+    const options = (data.options && typeof data.options === "object" && !Array.isArray(data.options))
+      ? { ...data.options }
+      : {};
+    if (Object.hasOwn(data, "max_pivots")) {
+      options.max_pivots = clamp(data.max_pivots, 1, 20);
+      delete data.max_pivots;
+    }
+    if (Object.hasOwn(options, "max_pivots")) {
+      options.max_pivots = clamp(options.max_pivots, 1, 20);
+    }
+    if (Object.keys(options).length > 0) {
+      data.options = options;
     }
   }
   if (command === "intel-search") {
