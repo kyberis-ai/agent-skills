@@ -1,0 +1,7 @@
+{
+  "package": "@kyberis-ai/agent-skills",
+  "version": "0.3.0",
+  "skill": "kyberis",
+  "agent": "github-copilot",
+  "contentHash": "sha256:1adb1cecf6974275b2aa9e104d66ff91848c22ed82b57f081587b9128fc7a368"
+}
