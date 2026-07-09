@@ -7,7 +7,7 @@ description: Queries the Kyberis API to resolve entities, look up evidence, find
 
 Use this skill for deterministic, bounded, evidence-backed threat intelligence investigations with the Kyberis agent API at `/v2/*`.
 
-Guides GitHub Copilot in Chat and agent mode. Keep this file focused on selecting the right workflow and handling failures. Read `references/api-reference.md` next to this file when you need exact endpoint paths, scopes, request examples, enum values, output formatting, or detailed gotchas. The short pointer installed at `.github/instructions/kyberis.instructions.md` (project scope) or registered in VS Code user settings (user scope) tells Copilot when to reach for this file.
+Guides GitHub Copilot's Agent Skills feature in Chat and agent mode. GitHub Copilot loads this file automatically from `.github/skills/kyberis/` (project scope) or `~/.copilot/skills/kyberis/` (user scope) based on the `description` above — no separate configuration file is needed. Keep this file focused on selecting the right workflow and handling failures. Read `references/api-reference.md` next to this file when you need exact endpoint paths, scopes, request examples, enum values, output formatting, or detailed gotchas.
 
 ## Investigation Standard
 

@@ -3,19 +3,25 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse as parseJsonc, modify as modifyJsonc, applyEdits, printParseErrorCode } from "jsonc-parser";
 
 const PACKAGE_NAME = "@kyberis-ai/agent-skills";
 const SKILL_NAME = "kyberis";
 const AGENTS = new Set(["codex", "claude", "cursor", "windsurf", "github-copilot", "generic"]);
 const SCOPES = new Set(["project", "user"]);
-// github.copilot.chat.codeGeneration.instructions is deprecated as of VS Code 1.102; the current
-// mechanism for personal (user-level) instructions is chat.instructionsFilesLocations, a map of
-// folder path -> enabled that supports "~" home-directory expansion and is scanned recursively
-// for *.instructions.md files. Confirmed 2026-07-03 against
-// https://code.visualstudio.com/docs/agent-customization/custom-instructions and
-// https://code.visualstudio.com/docs/agents/reference/ai-settings — re-check if user-scope
-// installs stop showing up in Copilot Chat on a newer VS Code release.
-const CHAT_INSTRUCTIONS_LOCATIONS_KEY = "chat.instructionsFilesLocations";
+// GitHub Copilot's Agent Skills feature (the same SKILL.md-based open standard this package
+// already targets for Codex/Claude/Cursor/Windsurf) auto-discovers project skills under
+// .github/skills/, .claude/skills/, .agents/skills/ and personal skills under ~/.copilot/skills/,
+// ~/.claude/skills/, ~/.agents/skills/ — no settings.json registration required for those default
+// locations. chat.agentSkillsLocations only extends discovery to additional, non-default
+// directories (e.g. a custom --dir); it takes folder globs like ".github/skills/**". This is
+// unrelated to the older chat.instructionsFilesLocations / deprecated
+// github.copilot.chat.codeGeneration.instructions settings, which govern free-text custom
+// instructions rather than Agent Skills. Confirmed 2026-07-09 against
+// https://code.visualstudio.com/docs/agent-customization/agent-skills and
+// https://github.blog/changelog/2025-12-18-github-copilot-now-supports-agent-skills/ — re-check if
+// user-scope custom-`--dir` installs stop showing up in Copilot on a newer VS Code/Copilot release.
+const CHAT_AGENT_SKILLS_LOCATIONS_KEY = "chat.agentSkillsLocations";
 const __filename = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(__filename), "..");
 const sourceRoot = path.join(packageRoot, "source");
@@ -39,7 +45,6 @@ const repoSkillDirs = {
 };
 
 const repoCursorRuleFile = path.join(".cursor", "rules", `${SKILL_NAME}.mdc`);
-const repoGithubCopilotInstructionsFile = path.join(".github", "instructions", `${SKILL_NAME}.instructions.md`);
 
 function usage() {
   return `Usage:
@@ -170,30 +175,6 @@ function writeCursorRule(ruleFile, bundle, { force = false } = {}) {
   fs.writeFileSync(ruleFile, body);
 }
 
-function githubCopilotInstructionsFromBundle(bundle) {
-  const instructions = bundle.files.get("instructions/kyberis.instructions.md");
-  if (!instructions) throw new Error("GitHub Copilot bundle is missing instructions/kyberis.instructions.md");
-  return instructions;
-}
-
-function writeGithubCopilotInstructions(instructionsFile, bundle, { force = false } = {}) {
-  const body = githubCopilotInstructionsFromBundle(bundle);
-  if (!force && fs.existsSync(instructionsFile)) {
-    const existing = fs.readFileSync(instructionsFile);
-    if (!Buffer.from(existing).equals(Buffer.from(body))) {
-      throw new Error(
-        `${instructionsFile} already exists and differs from the Kyberis GitHub Copilot instructions. Use --force to overwrite.`
-      );
-    }
-  }
-  try {
-    fs.mkdirSync(path.dirname(instructionsFile), { recursive: true });
-    fs.writeFileSync(instructionsFile, body);
-  } catch (error) {
-    throw new Error(`Could not write GitHub Copilot instructions to ${instructionsFile}: ${error.message}`);
-  }
-}
-
 function vsCodeUserSettingsFile() {
   if (process.env.KYBERIS_VSCODE_SETTINGS_FILE) {
     return path.resolve(process.env.KYBERIS_VSCODE_SETTINGS_FILE);
@@ -218,66 +199,79 @@ function vsCodeUserSettingsFile() {
   );
 }
 
-function readJsonObjectOrDefault(file) {
-  if (!fs.existsSync(file)) return {};
-  const raw = fs.readFileSync(file, "utf8").trim();
-  if (!raw) return {};
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
+function readSettingsText(file) {
+  if (!fs.existsSync(file)) return "";
+  return fs.readFileSync(file, "utf8");
+}
+
+// Tolerant of comments and trailing commas (VS Code settings.json is edited as JSONC), but still
+// surfaces genuine syntax errors as an actionable message rather than silently losing settings.
+function parseJsoncObject(text, file) {
+  if (!text.trim()) return {};
+  const errors = [];
+  const parsed = parseJsonc(text, errors, { allowTrailingComma: true, disallowComments: false });
+  if (errors.length) {
+    const [{ error, offset }] = errors;
     throw new Error(
-      `Could not parse ${file} as JSON (${error.message}). Remove comments/trailing commas, or add this entry to "${CHAT_INSTRUCTIONS_LOCATIONS_KEY}" manually.`
+      `Could not parse ${file} as JSON near offset ${offset} (${printParseErrorCode(error)}). Fix the syntax, or add this entry to "${CHAT_AGENT_SKILLS_LOCATIONS_KEY}" manually.`
     );
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error(`${file} does not contain a JSON object; cannot register Kyberis GitHub Copilot instructions.`);
+    throw new Error(`${file} does not contain a JSON object; cannot register the Kyberis GitHub Copilot skill location.`);
   }
   return parsed;
 }
 
-// Home-directory-relative form ("~/...") because chat.instructionsFilesLocations resolves
-// relative paths from the workspace root, not the user's home directory; "~" is the
-// documented way to point it at a folder outside any specific workspace.
+// Home-directory-relative form ("~/...") so the glob works regardless of which workspace is open;
+// chat.agentSkillsLocations resolves plain relative paths from the workspace root, not home.
 function tildeRelativePath(targetDir) {
   const relative = path.relative(os.homedir(), targetDir);
   if (relative.startsWith("..")) return null;
   return `~/${relative.split(path.sep).join("/")}`;
 }
 
-function registerVsCodeCopilotInstructionsLocation(settingsFile, instructionsDir) {
-  const settings = readJsonObjectOrDefault(settingsFile);
-  const existingLocations =
-    typeof settings[CHAT_INSTRUCTIONS_LOCATIONS_KEY] === "object" && settings[CHAT_INSTRUCTIONS_LOCATIONS_KEY] !== null
-      ? settings[CHAT_INSTRUCTIONS_LOCATIONS_KEY]
-      : {};
-  const key = tildeRelativePath(instructionsDir) || path.resolve(instructionsDir);
-  if (existingLocations[key] === true) return { registered: false, key };
+function toForwardSlashes(p) {
+  return p.split(path.sep).join("/");
+}
 
-  settings[CHAT_INSTRUCTIONS_LOCATIONS_KEY] = { ...existingLocations, [key]: true };
+// chat.agentSkillsLocations entries are skills-root directories (e.g. ".github/skills/**", one
+// level above individual "<skill-name>/SKILL.md" folders), not the skill's own folder.
+function agentSkillsLocationGlob(skillDir) {
+  const skillsRoot = path.dirname(skillDir);
+  const base = tildeRelativePath(skillsRoot) || toForwardSlashes(path.resolve(skillsRoot));
+  return `${base.replace(/\/$/, "")}/**`;
+}
+
+function registerVsCodeCopilotSkillsLocation(settingsFile, locationGlob) {
+  const originalText = readSettingsText(settingsFile);
+  const settings = parseJsoncObject(originalText, settingsFile);
+  const existingLocations =
+    typeof settings[CHAT_AGENT_SKILLS_LOCATIONS_KEY] === "object" && settings[CHAT_AGENT_SKILLS_LOCATIONS_KEY] !== null
+      ? settings[CHAT_AGENT_SKILLS_LOCATIONS_KEY]
+      : {};
+  if (existingLocations[locationGlob] === true) return { registered: false, key: locationGlob };
+
+  const edits = modifyJsonc(originalText, [CHAT_AGENT_SKILLS_LOCATIONS_KEY, locationGlob], true, {
+    formattingOptions: { insertSpaces: true, tabSize: 2, eol: "\n" },
+  });
+  const updatedText = applyEdits(originalText, edits);
   try {
     fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
-    fs.writeFileSync(settingsFile, `${JSON.stringify(settings, null, 2)}\n`);
+    fs.writeFileSync(settingsFile, updatedText);
   } catch (error) {
     throw new Error(`Could not update VS Code user settings at ${settingsFile}: ${error.message}`);
   }
-  return { registered: true, key };
+  return { registered: true, key: locationGlob };
 }
 
 function githubCopilotTargets(scope, options) {
   assertScope(scope);
   if (scope === "project") {
     const root = path.resolve(options.dir || process.cwd());
-    return {
-      skillDir: path.join(root, ".github", "skills", SKILL_NAME),
-      instructionsFile: path.join(root, ".github", "instructions", `${SKILL_NAME}.instructions.md`),
-    };
+    return { skillDir: path.join(root, ".github", "skills", SKILL_NAME) };
   }
   const skillDir = path.resolve(options.dir || defaultInstallDirs["github-copilot"]);
-  return {
-    skillDir,
-    instructionsDir: path.join(skillDir, "instructions"),
-  };
+  return { skillDir, isDefaultLocation: skillDir === path.resolve(defaultInstallDirs["github-copilot"]) };
 }
 
 function installGithubCopilot(options) {
@@ -297,18 +291,22 @@ function installGithubCopilot(options) {
   console.log(`Installed Kyberis GitHub Copilot skill to ${skillDir}`);
 
   if (options.scope === "project") {
-    writeGithubCopilotInstructions(targets.instructionsFile, bundle, { force: options.force });
-    console.log(`Installed Kyberis GitHub Copilot instructions to ${targets.instructionsFile}`);
-    console.log(`GitHub Copilot auto-discovers instructions files under the default ${CHAT_INSTRUCTIONS_LOCATIONS_KEY} entry (.github/instructions/).`);
-  } else {
-    const settingsFile = vsCodeUserSettingsFile();
-    const { registered, key } = registerVsCodeCopilotInstructionsLocation(settingsFile, targets.instructionsDir);
-    console.log(
-      registered
-        ? `Registered ${key} in ${settingsFile} (${CHAT_INSTRUCTIONS_LOCATIONS_KEY})`
-        : `${key} is already registered in ${settingsFile} (${CHAT_INSTRUCTIONS_LOCATIONS_KEY})`
-    );
+    console.log("GitHub Copilot auto-discovers project skills under .github/skills/ — no further configuration needed.");
+    return;
   }
+  if (targets.isDefaultLocation) {
+    console.log("GitHub Copilot auto-discovers personal skills under ~/.copilot/skills/ — no further configuration needed.");
+    return;
+  }
+
+  const settingsFile = vsCodeUserSettingsFile();
+  const locationGlob = agentSkillsLocationGlob(skillDir);
+  const { registered } = registerVsCodeCopilotSkillsLocation(settingsFile, locationGlob);
+  console.log(
+    registered
+      ? `Registered ${locationGlob} in ${settingsFile} (${CHAT_AGENT_SKILLS_LOCATIONS_KEY}) since --dir is outside the default ~/.copilot/skills location`
+      : `${locationGlob} is already registered in ${settingsFile} (${CHAT_AGENT_SKILLS_LOCATIONS_KEY})`
+  );
 }
 
 function currentFiles(targetDir) {
@@ -469,11 +467,6 @@ function syncRepo() {
       writeCursorRule(ruleFile, bundle, { force: true });
       console.log(`Synced cursor rule to ${path.relative(repoRoot, ruleFile)}`);
     }
-    if (agent === "github-copilot") {
-      const instructionsFile = path.join(repoRoot, repoGithubCopilotInstructionsFile);
-      writeGithubCopilotInstructions(instructionsFile, bundle, { force: true });
-      console.log(`Synced github-copilot instructions to ${path.relative(repoRoot, instructionsFile)}`);
-    }
   }
 }
 
@@ -488,15 +481,6 @@ function checkRepo() {
       const ruleFile = path.join(repoRoot, repoCursorRuleFile);
       if (!fs.existsSync(ruleFile) || !Buffer.from(fs.readFileSync(ruleFile)).equals(Buffer.from(cursorRuleFromBundle(expected)))) {
         mismatches.push(`cursor:${repoCursorRuleFile}`);
-      }
-    }
-    if (agent === "github-copilot") {
-      const instructionsFile = path.join(repoRoot, repoGithubCopilotInstructionsFile);
-      if (
-        !fs.existsSync(instructionsFile) ||
-        !Buffer.from(fs.readFileSync(instructionsFile)).equals(Buffer.from(githubCopilotInstructionsFromBundle(expected)))
-      ) {
-        mismatches.push(`github-copilot:${repoGithubCopilotInstructionsFile}`);
       }
     }
     const existing = currentFiles(target);
@@ -558,8 +542,8 @@ export const internals = {
   writeBundle,
   writeCursorRule,
   githubCopilotTargets,
-  writeGithubCopilotInstructions,
-  registerVsCodeCopilotInstructionsLocation,
+  registerVsCodeCopilotSkillsLocation,
+  agentSkillsLocationGlob,
   vsCodeUserSettingsFile,
   tildeRelativePath,
 };

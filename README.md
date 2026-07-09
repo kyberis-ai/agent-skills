@@ -20,30 +20,34 @@ The installer writes the Kyberis skill into the agent's local skill directory:
 - Claude: `~/.claude/skills/kyberis`
 - Cursor: `~/.cursor/skills/kyberis` plus `~/.cursor/rules/kyberis.mdc` for automatic Agent selection
 - Windsurf: `~/.codeium/windsurf/skills/kyberis`
-- GitHub Copilot (`--scope project`): `<repo>/.github/skills/kyberis` plus `<repo>/.github/instructions/kyberis.instructions.md`, which GitHub Copilot auto-discovers
-- GitHub Copilot (`--scope user`): `~/.copilot/skills/kyberis`, registered as a `chat.instructionsFilesLocations` folder in your VS Code user `settings.json`
+- GitHub Copilot (`--scope project`): `<repo>/.github/skills/kyberis` — GitHub Copilot's Agent Skills feature auto-discovers this by default
+- GitHub Copilot (`--scope user`): `~/.copilot/skills/kyberis` — also auto-discovered by default; a custom `--dir` outside that default location is registered via `chat.agentSkillsLocations` in your VS Code user `settings.json`
 - Generic: the directory passed with `--dir`
 
 Use `--dir <path>` to install to a custom directory. Generic installs require `--dir` because unsupported agents do not share a standard skill path. `github-copilot` installs require `--scope <project|user>`; `--dir` optionally overrides the project root (project scope) or the skill bundle directory (user scope).
 
 ### GitHub Copilot
 
-Project-scoped installs are committed to the repository so GitHub Copilot (VS Code, Visual Studio, JetBrains, and github.com) picks them up automatically — no extra configuration needed:
+GitHub Copilot's [Agent Skills](https://code.visualstudio.com/docs/agent-customization/agent-skills) feature (the same `SKILL.md`-based open standard this package already targets for Codex/Claude/Cursor/Windsurf) auto-discovers skills from a fixed set of default directories, with no settings.json changes required in the common case:
 
-```bash
-cd my-repo
-npx -y @kyberis-ai/agent-skills install github-copilot --scope project
-```
+- Project scope writes to `.github/skills/kyberis`, one of the default project skill locations, so committing it is enough:
 
-User-scoped installs apply across all of your repositories by adding the installed skill's `instructions/` folder to VS Code's `chat.instructionsFilesLocations` setting in your user settings, so VS Code picks up `~/.copilot/skills/kyberis/instructions/kyberis.instructions.md` in every workspace:
+  ```bash
+  cd my-repo
+  npx -y @kyberis-ai/agent-skills install github-copilot --scope project
+  ```
 
-```bash
-npx -y @kyberis-ai/agent-skills install github-copilot --scope user
-```
+- User scope writes to `~/.copilot/skills/kyberis` by default, one of the default personal skill locations that applies across all of your repositories:
 
-VS Code's user `settings.json` location is resolved per-OS (`%APPDATA%\Code\User\settings.json` on Windows, `~/Library/Application Support/Code/User/settings.json` on macOS, `$XDG_CONFIG_HOME/Code/User/settings.json` or `~/.config/Code/User/settings.json` on Linux). Set `KYBERIS_VSCODE_SETTINGS_FILE` to point at a different settings file (for example, VS Code Insiders) if needed. Both commands are safe to re-run; they update in place instead of duplicating entries.
+  ```bash
+  npx -y @kyberis-ai/agent-skills install github-copilot --scope user
+  ```
 
-`chat.instructionsFilesLocations` (not the deprecated `github.copilot.chat.codeGeneration.instructions` setting) is the current VS Code mechanism for personal instructions as of VS Code 1.102+; see `src/cli.mjs` for the source/date this was confirmed against VS Code's docs, and re-check if user-scope installs stop showing up in Copilot Chat after a VS Code update.
+If you pass `--dir` to relocate a user-scope install outside `~/.copilot/skills`, the installer registers that directory's parent as a `chat.agentSkillsLocations` glob (e.g. `~/custom/skills/**`) in your VS Code user `settings.json` so Copilot still finds it — this is the only case that touches `settings.json`. That update preserves comments and formatting in an existing JSONC settings file, and is safe to re-run.
+
+VS Code's user `settings.json` location is resolved per-OS (`%APPDATA%\Code\User\settings.json` on Windows, `~/Library/Application Support/Code/User/settings.json` on macOS, `$XDG_CONFIG_HOME/Code/User/settings.json` or `~/.config/Code/User/settings.json` on Linux). Set `KYBERIS_VSCODE_SETTINGS_FILE` to point at a different settings file (for example, VS Code Insiders) if needed.
+
+See `src/cli.mjs` for the source/date this default-location and setting-name behavior was confirmed against VS Code/GitHub's docs, and re-check if a `--dir` install stops showing up in Copilot after a VS Code/Copilot update.
 
 ## Generic agents
 
@@ -74,7 +78,7 @@ kyberis-agent-skills sync
 kyberis-agent-skills check
 ```
 
-`sync` and `check` are repository maintenance commands. They keep `.codex/skills/kyberis`, `.claude/skills/kyberis`, `.cursor/skills/kyberis`, `.cursor/rules/kyberis.mdc`, `.windsurf/skills/kyberis`, `.github/skills/kyberis`, and `.github/instructions/kyberis.instructions.md` in sync with this package's canonical source.
+`sync` and `check` are repository maintenance commands. They keep `.codex/skills/kyberis`, `.claude/skills/kyberis`, `.cursor/skills/kyberis`, `.cursor/rules/kyberis.mdc`, `.windsurf/skills/kyberis`, and `.github/skills/kyberis` in sync with this package's canonical source.
 
 ## Runtime setup
 

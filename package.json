@@ -44,5 +44,8 @@
   "bugs": {
     "url": "https://github.com/kyberis-ai/agent-skills/issues"
   },
-  "homepage": "https://kyberis.ai"
+  "homepage": "https://kyberis.ai",
+  "dependencies": {
+    "jsonc-parser": "^3.3.1"
+  }
 }
