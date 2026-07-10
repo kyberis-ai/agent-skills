@@ -3,10 +3,25 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse as parseJsonc, modify as modifyJsonc, applyEdits, printParseErrorCode } from "jsonc-parser";
 
 const PACKAGE_NAME = "@kyberis-ai/agent-skills";
 const SKILL_NAME = "kyberis";
-const AGENTS = new Set(["codex", "claude", "cursor", "windsurf", "generic"]);
+const AGENTS = new Set(["codex", "claude", "cursor", "windsurf", "github-copilot", "generic"]);
+const SCOPES = new Set(["project", "user"]);
+// GitHub Copilot's Agent Skills feature (the same SKILL.md-based open standard this package
+// already targets for Codex/Claude/Cursor/Windsurf) auto-discovers project skills under
+// .github/skills/, .claude/skills/, .agents/skills/ and personal skills under ~/.copilot/skills/,
+// ~/.claude/skills/, ~/.agents/skills/ — no settings.json registration required for those default
+// locations. chat.agentSkillsLocations only extends discovery to additional, non-default
+// directories (e.g. a custom --dir); it takes folder globs like ".github/skills/**". This is
+// unrelated to the older chat.instructionsFilesLocations / deprecated
+// github.copilot.chat.codeGeneration.instructions settings, which govern free-text custom
+// instructions rather than Agent Skills. Confirmed 2026-07-09 against
+// https://code.visualstudio.com/docs/agent-customization/agent-skills and
+// https://github.blog/changelog/2025-12-18-github-copilot-now-supports-agent-skills/ — re-check if
+// user-scope custom-`--dir` installs stop showing up in Copilot on a newer VS Code/Copilot release.
+const CHAT_AGENT_SKILLS_LOCATIONS_KEY = "chat.agentSkillsLocations";
 const __filename = fileURLToPath(import.meta.url);
 const packageRoot = path.resolve(path.dirname(__filename), "..");
 const sourceRoot = path.join(packageRoot, "source");
@@ -16,6 +31,7 @@ const defaultInstallDirs = {
   claude: path.join(os.homedir(), ".claude", "skills", SKILL_NAME),
   cursor: path.join(os.homedir(), ".cursor", "skills", SKILL_NAME),
   windsurf: path.join(os.homedir(), ".codeium", "windsurf", "skills", SKILL_NAME),
+  "github-copilot": path.join(os.homedir(), ".copilot", "skills", SKILL_NAME),
 };
 
 const defaultCursorRuleFile = path.join(os.homedir(), ".cursor", "rules", `${SKILL_NAME}.mdc`);
@@ -25,6 +41,7 @@ const repoSkillDirs = {
   claude: path.join(".claude", "skills", SKILL_NAME),
   cursor: path.join(".cursor", "skills", SKILL_NAME),
   windsurf: path.join(".windsurf", "skills", SKILL_NAME),
+  "github-copilot": path.join(".github", "skills", SKILL_NAME),
 };
 
 const repoCursorRuleFile = path.join(".cursor", "rules", `${SKILL_NAME}.mdc`);
@@ -32,9 +49,11 @@ const repoCursorRuleFile = path.join(".cursor", "rules", `${SKILL_NAME}.mdc`);
 function usage() {
   return `Usage:
   kyberis-agent-skills install <codex|claude|cursor|windsurf> [--dir <path>] [--force]
+  kyberis-agent-skills install github-copilot --scope <project|user> [--dir <path>] [--force]
   kyberis-agent-skills install generic --dir <path> [--force]
   kyberis-agent-skills update [--force]
   kyberis-agent-skills status [codex|claude|cursor|windsurf|generic] [--dir <path>]
+  kyberis-agent-skills status github-copilot --scope <project|user> [--dir <path>]
   kyberis-agent-skills sync
   kyberis-agent-skills check
   kyberis-agent-skills --help
@@ -47,7 +66,7 @@ function packageVersion() {
 }
 
 function parseOptions(argv) {
-  const options = { force: false, dir: "" };
+  const options = { force: false, dir: "", scope: "" };
   const positional = [];
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
@@ -56,6 +75,9 @@ function parseOptions(argv) {
     } else if (token === "--dir") {
       options.dir = String(argv[++i] || "").trim();
       if (!options.dir) throw new Error("--dir requires a path");
+    } else if (token === "--scope") {
+      options.scope = String(argv[++i] || "").trim();
+      if (!options.scope) throw new Error("--scope requires a value");
     } else if (token === "-h" || token === "--help") {
       options.help = true;
     } else {
@@ -68,6 +90,15 @@ function parseOptions(argv) {
 function assertAgent(agent) {
   if (!AGENTS.has(agent)) {
     throw new Error(`Expected one of: ${Array.from(AGENTS).join(", ")}`);
+  }
+}
+
+function assertScope(scope) {
+  if (!scope) {
+    throw new Error("github-copilot requires --scope <project|user>");
+  }
+  if (!SCOPES.has(scope)) {
+    throw new Error(`Expected --scope to be one of: ${Array.from(SCOPES).join(", ")}`);
   }
 }
 
@@ -142,6 +173,140 @@ function writeCursorRule(ruleFile, bundle, { force = false } = {}) {
   }
   fs.mkdirSync(path.dirname(ruleFile), { recursive: true });
   fs.writeFileSync(ruleFile, body);
+}
+
+function vsCodeUserSettingsFile() {
+  if (process.env.KYBERIS_VSCODE_SETTINGS_FILE) {
+    return path.resolve(process.env.KYBERIS_VSCODE_SETTINGS_FILE);
+  }
+  const platform = os.platform();
+  if (platform === "win32") {
+    const appData = process.env.APPDATA;
+    if (!appData) {
+      throw new Error("Cannot locate the VS Code user settings file: the APPDATA environment variable is not set.");
+    }
+    return path.join(appData, "Code", "User", "settings.json");
+  }
+  if (platform === "darwin") {
+    return path.join(os.homedir(), "Library", "Application Support", "Code", "User", "settings.json");
+  }
+  if (platform === "linux") {
+    const xdgConfig = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+    return path.join(xdgConfig, "Code", "User", "settings.json");
+  }
+  throw new Error(
+    `github-copilot user-scope install is not supported on platform '${platform}'. Set KYBERIS_VSCODE_SETTINGS_FILE to override the settings.json path.`
+  );
+}
+
+function readSettingsText(file) {
+  if (!fs.existsSync(file)) return "";
+  return fs.readFileSync(file, "utf8");
+}
+
+// Tolerant of comments and trailing commas (VS Code settings.json is edited as JSONC), but still
+// surfaces genuine syntax errors as an actionable message rather than silently losing settings.
+function parseJsoncObject(text, file) {
+  if (!text.trim()) return {};
+  const errors = [];
+  const parsed = parseJsonc(text, errors, { allowTrailingComma: true, disallowComments: false });
+  if (errors.length) {
+    const [{ error, offset }] = errors;
+    throw new Error(
+      `Could not parse ${file} as JSON near offset ${offset} (${printParseErrorCode(error)}). Fix the syntax, or add this entry to "${CHAT_AGENT_SKILLS_LOCATIONS_KEY}" manually.`
+    );
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`${file} does not contain a JSON object; cannot register the Kyberis GitHub Copilot skill location.`);
+  }
+  return parsed;
+}
+
+// Home-directory-relative form ("~/...") so the glob works regardless of which workspace is open;
+// chat.agentSkillsLocations resolves plain relative paths from the workspace root, not home.
+function tildeRelativePath(targetDir) {
+  const relative = path.relative(os.homedir(), targetDir);
+  if (relative.startsWith("..")) return null;
+  return `~/${relative.split(path.sep).join("/")}`;
+}
+
+function toForwardSlashes(p) {
+  return p.split(path.sep).join("/");
+}
+
+// chat.agentSkillsLocations entries are skills-root directories (e.g. ".github/skills/**", one
+// level above individual "<skill-name>/SKILL.md" folders), not the skill's own folder.
+function agentSkillsLocationGlob(skillDir) {
+  const skillsRoot = path.dirname(skillDir);
+  const base = tildeRelativePath(skillsRoot) || toForwardSlashes(path.resolve(skillsRoot));
+  return `${base.replace(/\/$/, "")}/**`;
+}
+
+function registerVsCodeCopilotSkillsLocation(settingsFile, locationGlob) {
+  const originalText = readSettingsText(settingsFile);
+  const settings = parseJsoncObject(originalText, settingsFile);
+  const existingLocations =
+    typeof settings[CHAT_AGENT_SKILLS_LOCATIONS_KEY] === "object" && settings[CHAT_AGENT_SKILLS_LOCATIONS_KEY] !== null
+      ? settings[CHAT_AGENT_SKILLS_LOCATIONS_KEY]
+      : {};
+  if (existingLocations[locationGlob] === true) return { registered: false, key: locationGlob };
+
+  const edits = modifyJsonc(originalText, [CHAT_AGENT_SKILLS_LOCATIONS_KEY, locationGlob], true, {
+    formattingOptions: { insertSpaces: true, tabSize: 2, eol: "\n" },
+  });
+  const updatedText = applyEdits(originalText, edits);
+  try {
+    fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
+    fs.writeFileSync(settingsFile, updatedText);
+  } catch (error) {
+    throw new Error(`Could not update VS Code user settings at ${settingsFile}: ${error.message}`);
+  }
+  return { registered: true, key: locationGlob };
+}
+
+function githubCopilotTargets(scope, options) {
+  assertScope(scope);
+  if (scope === "project") {
+    const root = path.resolve(options.dir || process.cwd());
+    return { skillDir: path.join(root, ".github", "skills", SKILL_NAME) };
+  }
+  const skillDir = path.resolve(options.dir || defaultInstallDirs["github-copilot"]);
+  return { skillDir, isDefaultLocation: skillDir === path.resolve(defaultInstallDirs["github-copilot"]) };
+}
+
+function installGithubCopilot(options) {
+  const targets = githubCopilotTargets(options.scope, options);
+  const { skillDir } = targets;
+  const bundle = bundleForAgent("github-copilot", { installedAt: new Date().toISOString() });
+  try {
+    writeBundle(skillDir, bundle, { force: options.force, installMode: true });
+  } catch (error) {
+    // writeBundle's own "already exists"/"has local changes" errors are already actionable
+    // (no .code); only wrap genuine filesystem failures (EACCES, EROFS, ENOTDIR, ...).
+    if (error && error.code) {
+      throw new Error(`Could not write GitHub Copilot skill files to ${skillDir}: ${error.message}`);
+    }
+    throw error;
+  }
+  console.log(`Installed Kyberis GitHub Copilot skill to ${skillDir}`);
+
+  if (options.scope === "project") {
+    console.log("GitHub Copilot auto-discovers project skills under .github/skills/ — no further configuration needed.");
+    return;
+  }
+  if (targets.isDefaultLocation) {
+    console.log("GitHub Copilot auto-discovers personal skills under ~/.copilot/skills/ — no further configuration needed.");
+    return;
+  }
+
+  const settingsFile = vsCodeUserSettingsFile();
+  const locationGlob = agentSkillsLocationGlob(skillDir);
+  const { registered } = registerVsCodeCopilotSkillsLocation(settingsFile, locationGlob);
+  console.log(
+    registered
+      ? `Registered ${locationGlob} in ${settingsFile} (${CHAT_AGENT_SKILLS_LOCATIONS_KEY}) since --dir is outside the default ~/.copilot/skills location`
+      : `${locationGlob} is already registered in ${settingsFile} (${CHAT_AGENT_SKILLS_LOCATIONS_KEY})`
+  );
 }
 
 function currentFiles(targetDir) {
@@ -231,6 +396,11 @@ function findRepoRoot(start = process.cwd()) {
 
 function install(agent, options) {
   assertAgent(agent);
+  if (agent === "github-copilot") {
+    assertScope(options.scope);
+    installGithubCopilot(options);
+    return;
+  }
   if (agent === "generic" && !options.dir) {
     throw new Error("generic installs require --dir <path>");
   }
@@ -250,7 +420,14 @@ function status(agent, options) {
     console.log("generic: provide --dir <path> to inspect a generic installation");
     return false;
   }
-  const target = path.resolve(options.dir || defaultInstallDirs[agent]);
+  if (agent === "github-copilot" && !options.scope) {
+    console.log("github-copilot: provide --scope <project|user> to inspect an installation");
+    return false;
+  }
+  const target =
+    agent === "github-copilot"
+      ? githubCopilotTargets(options.scope, options).skillDir
+      : path.resolve(options.dir || defaultInstallDirs[agent]);
   const manifest = readManifest(target);
   if (!manifest) {
     console.log(`${agent}: not installed at ${target}`);
@@ -270,7 +447,8 @@ function updateAll(options) {
     const target = path.resolve(defaultInstallDirs[agent]);
     const manifest = readManifest(target);
     if (!manifest || manifest.package !== PACKAGE_NAME || manifest.skill !== SKILL_NAME) continue;
-    install(agent, { ...options, dir: target });
+    const agentOptions = agent === "github-copilot" ? { ...options, scope: "user", dir: target } : { ...options, dir: target };
+    install(agent, agentOptions);
     installed += 1;
   }
   if (installed === 0) console.log("No installed Kyberis skills found.");
@@ -363,4 +541,9 @@ export const internals = {
   status,
   writeBundle,
   writeCursorRule,
+  githubCopilotTargets,
+  registerVsCodeCopilotSkillsLocation,
+  agentSkillsLocationGlob,
+  vsCodeUserSettingsFile,
+  tildeRelativePath,
 };
