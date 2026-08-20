@@ -131,6 +131,10 @@ These are not callable with an ApiKey header. Skip them in agent flows.
 - `POST /v2/relationships`
   - When: you need actor/campaign/malware/sector/ioc/technique pivots from a subject.
   - Why: relationships explain impact pathways and support action planning.
+  - Pagination: treat `next_cursor` as opaque. Send it back unchanged with
+    the same request inputs to continue the same ranked snapshot; do not parse
+    or synthesize relationship cursors. Relationship snapshots contain up to
+    500 ranked results; stability is not guaranteed beyond five 100-result pages.
 
 - `POST /v2/cve-assessments`
   - When: subject is primarily a CVE.
@@ -450,7 +454,8 @@ When showing results to the user:
   not_applicable), then canonical_id/canonical_name and the top
   candidates with their match scores.
 - Relationships: group by relationship_type, show canonical_id,
-  score, and evidence_count.
+  score, and evidence_count. Surface `next_cursor` when more pivots are
+  available; relationship cursors are short-lived opaque snapshot tokens.
 - Prioritize: show meta.ranked_count and meta.truncated, then bullets
   of top items with priority, priority_score, and
   recommended_action_summary.
@@ -466,8 +471,10 @@ When showing results to the user:
   For batch endpoints, top-level `agent_context` is required; item-level
   contexts are optional because the API propagates the top-level context.
 - API schema batch limits are 1-50 items, but account plans or MCP schemas may set smaller plan limits.
-- Field caps: query max 1024 chars, cursor max 512 chars, seen_signal_ids
-  max 500 entries each max 128 chars.
+- Field caps: query max 1024 chars, cursor max 512 chars, relationships
+  max_results max 100 over a 500-result snapshot, seen_signal_ids max 500
+  entries each max 128 chars. A sixth 100-result relationship page is outside
+  the stable snapshot guarantee.
 - Credit precheck: out-of-credit principals get rejected before work runs with
   `error_code` or `reason` such as `credit_exhausted`.
 - Auth rate limiting: repeated bad keys return 429 with
