@@ -268,11 +268,11 @@ function boundedPayload(command, payload) {
       });
     }
     if (Object.hasOwn(data, "max_items")) {
-      data.max_results = clamp(data.max_items, 1, 50);
+      data.max_results = clamp(data.max_items, 1, 100);
       delete data.max_items;
     }
     if (Object.hasOwn(data, "max_results")) {
-      data.max_results = clamp(data.max_results, 1, 50);
+      data.max_results = clamp(data.max_results, 1, 100);
     }
   }
   if (command === "prioritize") {
