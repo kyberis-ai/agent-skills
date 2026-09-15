@@ -475,8 +475,10 @@ When showing results to the user:
   max_results max 100 over a 500-result snapshot, seen_signal_ids max 500
   entries each max 128 chars. A sixth 100-result relationship page is outside
   the stable snapshot guarantee.
-- Credit precheck: out-of-credit principals get rejected before work runs with
-  `error_code` or `reason` such as `credit_exhausted`.
+- Credit precheck: a request needing more credits than the account has available
+  is rejected before work runs with `error_code` or `reason` such as
+  `credit_exhausted`. The balance may still be nonzero; compare
+  `requested_credits` with `available_credits` before describing the blocker.
 - Auth rate limiting: repeated bad keys return 429 with
   retry_after_seconds. Back off, do not retry tight.
 - Scope errors: 403 with a scope name in the body means the API key was
