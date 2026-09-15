@@ -77,6 +77,15 @@ curl -s -X POST "$KYBERIS_BASE_URL/v2/entity-resolution" \
   }' | jq .
 ```
 
+## CVE Decision Boundaries
+
+- Use structured product names in `environment_context.products` for environment assessments and `environment.products` for prioritization. Set `inventory_complete: true` only when the user or inventory source explicitly establishes complete coverage; prose is not evaluated by the API.
+- Read `metadata.applicability` on environment assessments and `items[].applicability` on prioritization. `product_status` covers known source product names only; full `status` remains `unknown`. A product match does not confirm vulnerable versions, and a mismatch does not authorize automatic case closure.
+- Treat `validate_exposure` as a verification step. Preserve conditional remediation and verify versions/configuration before recommending a disruptive action. With missing inventory, request structured products or return a verification step.
+- For CVE assessments, `confidence` encodes support for known exploitation, not a probability of current activity or customer vulnerability. Keep caller assertions separate from retrieved evidence; retain `conditional_on`, caveats, and source availability.
+
+Read [CVE decision semantics](references/api-reference.md#cve-decision-semantics) before interpreting CVE confidence or environment applicability; it includes the product-state rules and request examples.
+
 ## Validation And Error Handling
 
 Run these checkpoints before proceeding to later steps:
@@ -89,7 +98,7 @@ Run these checkpoints before proceeding to later steps:
 - On `429`: back off using `retry_after_seconds` when present; reduce concurrency or batch size.
 - On any API error: preserve `request_id`, `run_id`, and `step_id` in your user-facing blocker/debug note.
 - On `5xx` or timeout: retry conservatively, then return partial findings with the failed step called out.
-- On degraded metadata: lower confidence, surface the degraded reason, and avoid decisive remediation unless independent evidence supports it.
+- On degraded metadata: preserve the returned confidence and its claim scope, surface the degraded reason, and qualify recommendations where evidence is missing.
 - On ambiguous resolution: ask a disambiguating question or retry with stricter `expected_types`.
 - On `not_found`: stop that branch and propose an alternate lookup path.
 - On batch partial failure: keep successful and failed items separate and preserve per-item caveats.

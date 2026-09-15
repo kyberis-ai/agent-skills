@@ -14,7 +14,7 @@ Use these before continuing to later workflow steps:
 - `429` rate limit: back off using `retry_after_seconds` when present; do not issue tight retries or expand batch size.
 - `batch_limit_exceeded`: reduce batch size to the reported plan limit before retrying.
 - `5xx` or network timeout: retry conservatively within `KYBERIS_MAX_RETRIES`; if still failing, return partial findings and the failed step.
-- Dependency/degraded response metadata: surface `degraded` or `degraded_reasons`, lower confidence, and avoid decisive recommendations unless supporting evidence is still strong.
+- Dependency/degraded response metadata: surface `degraded` or `degraded_reasons`, preserve returned confidence and its claim scope, and qualify recommendations affected by missing evidence.
 - Batch partial failure: keep per-item results separate, report failed item IDs/queries, and continue only when remaining successful items are sufficient for the user objective.
 
 ## Base URL and Authentication
@@ -175,6 +175,74 @@ Supported entity_type values: `actor`, `campaign`, `cve`, `domain`,
 `email`, `hash`, `ip`, `malware`, `url`. Same set is allowed in
 `expected_types`.
 
+## CVE Decision Semantics
+
+Apply these rules to CVE subjects on assessment routes, including batch. For
+environment relevance, also inspect CVE items returned by `/v2/prioritize`.
+
+### Separate evidence from caller premises and urgency
+
+- `metadata.caller_assertions` records supplied threat claims, verification status,
+  supporting references, and whether each claim affected the decision.
+  `metadata.conditional_on` names unverified input paths. Do not fill
+  `context.known_exploited`, `intel_confidence`, `campaign_status`, or `affected_cpes`
+  with assumptions to obtain a stronger verdict. Caller evidence references are
+  labeled `provenance: caller_asserted`; repeating a claim does not corroborate it.
+- For CVE assessments with `confidence_basis: cve_known_exploitation_support_v1`,
+  `0.90` / `high` encodes retrieved KEV support for known exploitation; `0.15` /
+  `insufficient` encodes unknown support. These are legacy bands, not calibrated
+  probabilities or confidence in action success. Inspect `metadata.evidence_support`.
+  Absence from KEV does not establish safety, and KEV does not prove current activity.
+- CVSS affects severity/risk; report publication dates establish neither current
+  activity nor campaign momentum. Exposure and conditional premises may raise
+  urgency without raising evidence support. Keep priority distinct from certainty;
+  a `today` result can mean urgent verification rather than an unconditional patch.
+- Do not apply those CVE assessment confidence bands to prioritize's separate
+  `confidence_score` or to IOC/actor assessments.
+
+### Structured inventory and product relevance
+
+Supply product names in `environment_context.products` for environment assessments
+(up to 100 names, each up to 200 characters), or `environment.products` for
+prioritization. `inventory_complete` is a strict boolean and defaults to false.
+Set it true only when coverage of the entire assessed environment is explicitly
+established by the caller or inventory source. A short example list is not a
+complete inventory. The API does not interpret prose `environment` or accept CVE
+scan-findings input; `context.affected_cpes` is a threat assertion, not inventory.
+
+Read `metadata.applicability` on environment assessments and `items[].applicability`
+on prioritization. The same name rules produce:
+
+| `product_status` | Meaning within `known_source_product_names` | Action |
+| --- | --- | --- |
+| `affected` | At least one supported alias or unambiguous name matches. | Verify vulnerable versions/configuration; preserve conditional remediation. |
+| `unaffected` | All compared names are known distinct and inventory is declared complete. | Monitor and verify inventory/source coverage before excluding the CVE. |
+| `unknown` | Missing/ambiguous names, missing source data, or no match with partial inventory. | Obtain/verify inventory and resolve applicability. |
+
+`Windows` and `Microsoft Windows` are supported aliases; arbitrary abbreviations,
+unqualified ambiguous names, or unspecified version/edition labels can remain
+unknown. Do not convert a string mismatch into a non-applicability conclusion.
+
+Full `applicability.status` stays `unknown`, with
+`basis: version_and_configuration_not_evaluated` and
+`source_product_metadata_complete: false`. Neither product-level `affected` nor
+`unaffected` proves vulnerable-asset applicability or exhaustive advisory coverage.
+If applicability metadata is absent (for example, an older API deployment), treat
+it as unassessed rather than inventing an affected/unaffected result.
+
+Environment assessment `priority.basis` explains verification urgency or conditional
+product exclusion; `metadata.applicability.threat_priority` retains the urgency
+before inventory adjustment. `environment_text_evaluated: false` makes the prose
+limit explicit. A complete inventory with known distinct products caps environment
+rank at `0.2` / `monitor`. KEV plus relevant exposure retains urgent verification
+and immediate remediation advice **if applicability is confirmed**.
+
+Prioritize CVE items use `recommended_action_type: validate_exposure`, or `monitor`
+for conditional product exclusion. Preserve the qualification in the summary.
+Its ranking formula differs from assessment; equivalent product evidence does not
+require equal ranking scores. Preserve caveats and conditions even in brief output
+or when `max_evidence_refs: 0` suppresses top-level references.
+
 ## Calling Conventions
 
 Use `Bash` with `curl` (preferred) or `WebFetch` for these. Always pipe
@@ -284,6 +352,7 @@ curl -s -X POST "$KYBERIS_BASE_URL/v2/prioritize" \
                       "run_id": "run-004", "step_id": "step-1"},
     "environment": {
       "products": ["Microsoft Exchange", "Palo Alto PAN-OS"],
+      "inventory_complete": false,
       "vendors": ["Microsoft", "Palo Alto Networks"],
       "industry": "financial_services",
       "geography": ["US"],
@@ -341,8 +410,7 @@ curl -s -X POST "$KYBERIS_BASE_URL/v2/cve-assessments" \
                       "requested_outcome": "priority + rationale",
                       "workflow_stage": "assessment",
                       "run_id": "run-005", "step_id": "step-1"},
-    "subject": {"entity_type": "cve", "canonical_id": "cve--2024-3400"},
-    "context": {"known_exploited": true, "targeted_industries": ["financial_services"]}
+    "subject": {"entity_type": "cve", "canonical_id": "cve--2024-3400"}
   }' | jq .
 ```
 
@@ -351,18 +419,22 @@ Same request envelope.
 
 ### Environment assessment
 
-Requires `environment_context` with at least one signal field:
+Requires a resolvable threat subject/query and `environment_context` with at least
+one signal field. The subject is the threat, not the organization name. For a
+CVE applicability question, supply structured product inventory:
 
 ```bash
 curl -s -X POST "$KYBERIS_BASE_URL/v2/environment-assessments" \
   -H "Authorization: ApiKey $KYBERIS_API_KEY_ID:$KYBERIS_API_KEY_SECRET" \
   -H "Content-Type: application/json" \
   -d '{
-    "agent_context": {"objective": "Score ACME prod posture",
+    "agent_context": {"objective": "Assess CVE-2024-3400 against supplied inventory",
                       "requested_outcome": "priority", "workflow_stage": "assessment",
                       "run_id": "run-006", "step_id": "step-1"},
-    "query": "ACME production",
+    "subject": {"entity_type": "cve", "canonical_id": "cve--2024-3400"},
     "environment_context": {
+      "products": ["Palo Alto PAN-OS"],
+      "inventory_complete": false,
       "sector": "financial_services",
       "regions": ["US"],
       "internet_exposure": "high",
@@ -444,9 +516,10 @@ assessment_type discriminator values: `threat_assessment`, `cve_assessment`,
 
 When showing results to the user:
 
-- Assessments: lead with `priority`, `confidence`, then `rationale_codes`
-  and `recommended_actions`. Mention degraded/degraded_reasons from metadata
-  if present, as they explain partial results.
+- Assessments: report priority and what the confidence supports, then rationale
+  and conditional actions. For CVE environment decisions preserve applicability,
+  caller premises, caveats, and any degradation; do not present the confidence
+  band as certainty that the customer is vulnerable.
 - Evidence responses: show `status`, `claim_type`, item count, then a
   short bullet list of items (title, stance, support_score, source).
   Surface `next_cursor` if pagination matters.
