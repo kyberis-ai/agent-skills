@@ -1,6 +1,6 @@
 {
   "package": "@kyberis-ai/agent-skills",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "skill": "kyberis",
   "agent": "windsurf",
   "contentHash": "sha256:0edee673f087a7656f1b8615a5c1c367a17d261fff70ecb794c3c10f8090b0b9"
