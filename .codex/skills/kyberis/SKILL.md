@@ -110,7 +110,7 @@ Use when the user provides stack, industry, geography, or business context and a
 1. Run `prioritize`.
 2. Validate the top 1-3 items with evidence and relationships.
 3. Run the relevant assessment for each material item.
-4. Return an action plan by item: `patch`, `validate_exposure`, `hunt`, `monitor`, `review_controls`, or `ignore`.
+4. Preserve each returned action type and its conditions. CVE items require `validate_exposure`, or `monitor` for conditional product exclusion; do not convert unknown applicability into `patch` or `ignore`.
 
 ## Claim Decomposition
 
@@ -124,6 +124,15 @@ Example: "Is CVE-X actively exploited by actors targeting healthcare?"
 
 Do not hide uncertainty inside one broad answer. Subclaims make confidence and evidence gaps explicit.
 
+## CVE Decision Boundaries
+
+- Use structured product names in `environment_context.products` for environment assessments and `environment.products` for prioritization. Set `inventory_complete: true` only when the user or inventory source explicitly establishes complete coverage; prose is not evaluated by the API.
+- Read `metadata.applicability` on environment assessments and `items[].applicability` on prioritization. `product_status` covers known source product names only; full `status` remains `unknown`. A product match does not confirm vulnerable versions, and a mismatch does not authorize automatic case closure.
+- Treat `validate_exposure` as a verification step. Preserve conditional remediation and verify versions/configuration before recommending a disruptive action. With missing inventory, request structured products or return a verification step.
+- For CVE assessments, `confidence` encodes support for known exploitation, not a probability of current activity or customer vulnerability. Keep caller assertions separate from retrieved evidence; retain `conditional_on`, caveats, and source availability.
+
+Read [CVE decision semantics](references/api-reference.md#cve-decision-semantics) before interpreting CVE confidence or environment applicability; it includes the product-state rules and request examples.
+
 ## Decision Gates
 
 - If resolution is `ambiguous`: ask a disambiguation question or retry with stricter `expected_types`.
@@ -133,7 +142,7 @@ Do not hide uncertainty inside one broad answer. Subclaims make confidence and e
 - If rate-limited or a transient server failure occurs: retry conservatively with backoff, using `retry_after_seconds` when present.
 - Preserve `request_id`, `run_id`, and `step_id` from error payloads when reporting failed calls.
 - If evidence is weak or sparse: state low confidence and recommend low-cost validation.
-- If high-confidence exploitation plus environment match is present: recommend immediate remediation or exposure validation.
+- For CVEs, if known exploitation and relevant exposure justify urgency: verify applicability urgently, then recommend remediation conditional on vulnerable versions/configuration being confirmed.
 
 ## Required Agent Behavior
 
