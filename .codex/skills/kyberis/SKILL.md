@@ -1,6 +1,6 @@
 ---
 name: kyberis
-description: Queries Kyberis to resolve entities, collect evidence, pivot relationships, prioritize threats, run assessments, and produce remediation recommendations. Use when users ask for Kyberis, threat lookups, incident investigations, evidence lookup, or security guidance.
+description: Queries Kyberis to resolve entities, collect evidence, pivot relationships and ATT&CK detection knowledge, prioritize threats, run assessments, and produce remediation recommendations. Use when users ask for Kyberis, threat lookups, incident investigations, evidence lookup, or security guidance.
 ---
 
 # Kyberis Skill
@@ -43,6 +43,8 @@ Use this sequence unless the user asks for a narrower path.
 
 ## Trigger Classification
 
+- ATT&CK technique/detection/telemetry question: follow the ATT&CK detection guidance below.
+
 - Raw indicator or entity-like input (`CVE-...`, IP, domain, URL, hash, actor alias): start with `entity-resolution`.
 - Broad topical question (`what happened with X`, `tell me about X`): start with `intel-search`, then resolve material entities.
 - Environment triage request (`what should we care about now`, stack/industry/region priority request): start with `prioritize`, then investigate top signals.
@@ -53,7 +55,7 @@ Use this sequence unless the user asks for a narrower path.
 - `entity-resolution`: normalize messy input and handle `resolved`, `ambiguous`, or `not_found` before downstream calls.
 - `intel-search`: discover relevant report capsules for broad or recent-event questions.
 - `evidence`: prove or disprove specific claims such as `active_exploitation`, `sector_targeting`, or `observed_in_the_wild`.
-- `relationships`: pivot from a subject to related actors, campaigns, malware, sectors, IoCs, or CVE exploitation techniques.
+- `relationships`: pivot from a subject to related actors, campaigns, malware, sectors, IoCs, CVE exploitation techniques, or authored ATT&CK detection and telemetry knowledge.
 - `cve-assessments`: produce deterministic CVE decision support.
 - `actor-assessments`: produce deterministic actor-focused risk guidance.
 - `ioc-assessments`: produce deterministic IOC-focused risk guidance; preserve exact IOC strings.
@@ -62,6 +64,25 @@ Use this sequence unless the user asks for a narrower path.
 - `environment-assessments`: assess a customer's environment when this endpoint is available through MCP or direct HTTP.
 
 See `references/api-reference.md` for endpoint paths, scopes, limits, controlled vocabularies, and failure handling.
+
+## ATT&CK detection guidance
+
+For technique, detection, or telemetry questions, use `relationships` directly
+with an exact ATT&CK ID (for example `T1059.001`) and explicit ATT&CK targets or
+predicates. Technique IDs are techniques, not domains. Use
+`expected_types: ["technique"]` when resolving a technique separately.
+
+From a technique, request incoming `detects` links to `detection-strategy`, then
+outgoing `has_analytic` links to `analytic`, `requires_data_component` links to
+`data-component`, and `belongs_to_data_source` links to `data-source` where
+available. Use outgoing `belongs_to` for technique-to-tactic membership. Reuse
+returned canonical IDs and keep actor/IOC pivots in separate requests.
+
+Read [ATT&CK traversal](references/api-reference.md#attck-detection-and-telemetry-traversal)
+for request examples, filters, pagination, and response fields. Use authored
+content and citations for a detection engineering handoff; do not present it as
+observed procedure execution or a generated emulation script. These new entity
+types do not imply support in assessment or generic hydration endpoints.
 
 ## Playbooks
 
@@ -148,7 +169,7 @@ Read [CVE decision semantics](references/api-reference.md#cve-decision-semantics
 
 - Prefer MCP tools over direct REST calls.
 - Include valid `agent_context` on every POST call.
-- For `expected_types`, use only concrete entity types: `actor`, `campaign`, `cve`, `domain`, `email`, `hash`, `ip`, `malware`, `url`.
+- Entity resolution accepts `technique` alongside the existing concrete entity types (`actor`, `campaign`, `cve`, `domain`, `email`, `hash`, `ip`, `malware`, `url`). Relationships also accept `tactic`, `detection-strategy`, `analytic`, `data-component`, and `data-source` as subjects and expected types. Check endpoint-specific types before assessment or hydration calls.
 - Do not pass `ioc` in `expected_types`; expand IOC intent to concrete types such as `ip`, `domain`, `url`, `email`, and `hash`.
 - Bound payloads with documented limits.
 - Never guess across ambiguity.
