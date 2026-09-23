@@ -171,9 +171,12 @@ IOC fidelity rule:
 - If you use `subject` mode for IOC evidence/assessment, include `subject.canonical_name` and preserve the exact IOC string.
 - If subject-mode IOC results look unexpectedly weak (for example `no_evidence` or `ioc_lookup_status=no_match`) after exact resolution, retry once in exact `query` mode before final recommendation.
 
-Supported entity_type values: `actor`, `campaign`, `cve`, `domain`,
-`email`, `hash`, `ip`, `malware`, `url`. Same set is allowed in
-`expected_types`.
+Entity resolution accepts `actor`, `campaign`, `cve`, `domain`, `email`,
+`hash`, `ip`, `malware`, `technique`, and `url` in `expected_types`.
+Relationships additionally accept `tactic`, `detection-strategy`, `analytic`,
+`data-component`, and `data-source` as subjects and expected types. These
+relationship-specific types are not inputs to assessment or generic hydration
+endpoints. Use the endpoint-specific contract rather than a global type list.
 
 ## CVE Decision Semantics
 
@@ -468,7 +471,96 @@ curl -s -X POST "$KYBERIS_BASE_URL/v2/relationships" \
 For CVE subjects, include `technique` when you need exploitation technique
 context. The API resolves this through the vulnerability described by the CVE.
 
-relationship_types values: `actor`, `campaign`, `malware`, `sector`, `ioc`, `technique`.
+General relationship targets: `actor`, `campaign`, `malware`, `sector`, `country`,
+`ioc`, `technique`. For ATT&CK traversal, use the types below.
+
+### ATT&CK detection and telemetry traversal
+
+Use `POST /v2/relationships` (scope `read:relationships`) or the corresponding
+MCP tool for authored ATT&CK guidance. The batch endpoint accepts the same
+per-item fields and also requires `batch:relationships`. Keep exactly one of
+`query` or `subject`; include the usual `agent_context`.
+
+`relationship_types` filters **target entity types**: `tactic`, `technique`,
+`detection-strategy`, `analytic`, `data-component`, `data-source`.
+`predicates` filters the meaning of each directed link:
+
+| Source → target | Predicate |
+| --- | --- |
+| Technique → tactic | `belongs_to` |
+| Detection strategy → technique | `detects` |
+| Detection strategy → analytic | `has_analytic` |
+| Analytic → data component | `requires_data_component` |
+| Data component → data source | `belongs_to_data_source` |
+
+`direction` is relative to your subject: `incoming`, `outgoing`, or `both`
+(default). For a technique's detection strategies, use **incoming** `detects`.
+For a strategy's analytics, use **outgoing** `has_analytic`.
+
+```bash
+curl -sS -X POST "$KYBERIS_BASE_URL/v2/relationships" \
+  -H "Authorization: ApiKey $KYBERIS_API_KEY_ID:$KYBERIS_API_KEY_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_context": {
+      "objective": "Find ATT&CK detection guidance for PowerShell.",
+      "requested_outcome": "Identify detection strategies and analytics.",
+      "workflow_stage": "relationships",
+      "run_id": "run-powershell-001",
+      "step_id": "step-01"
+    },
+    "query": "T1059.001",
+    "expected_types": ["technique"],
+    "relationship_types": ["detection-strategy"],
+    "predicates": ["detects"],
+    "direction": "incoming",
+    "max_results": 10
+  }'
+```
+
+For the next step, replace `query` and `expected_types` with a `subject` using
+one returned item's `canonical_id` and `target_entity_type` (as `entity_type`).
+Set `relationship_types: ["analytic"]`, `predicates: ["has_analytic"]`, and
+`direction: "outgoing"`; advance the agent-context step ID. Continue through
+data components and sources using the table. Follow source links only when the
+dataset supplies them.
+
+Resolution in ATT&CK traversal accepts exact canonical IDs, STIX IDs, external
+ATT&CK IDs (such as `T1059.001`, `DET0455`, `AN1252`, or `TA0002`), and exact names.
+Use `expected_types` to disambiguate names. Do not construct canonical IDs; reuse
+returned IDs unchanged. Explicit ATT&CK predicates or new target types select
+this traversal. General relationship calls retain their existing defaults.
+Actor, campaign, malware, IOC, sector, and country targets cannot be mixed into
+an ATT&CK traversal; make separate requests for those pivots.
+
+Filters and pagination:
+
+- `platform` (for example `Windows`) excludes explicitly incompatible targets;
+  targets without platform metadata remain eligible.
+- `include_inactive` defaults to `false`, excluding links involving revoked or
+  deprecated techniques, strategies, and analytics. Set it to `true` to include
+  them with status. Legacy components/sources remain visible with lifecycle
+  status so required telemetry references are not lost.
+- `max_results` defaults to 10 and accepts 1–100. Return `next_cursor` unchanged
+  as `cursor` with the same subject, filters, and context. ATT&CK cursors bind
+  to the request and result snapshot; HTTP 400 for a stale cursor means restart
+  without it. General traversal's ten-minute cursor expiry and 500-result
+  snapshot rules do not apply here. Oversized catalogs return HTTP 503 instead
+  of silently incomplete traversal.
+
+Read `items[].metadata.entity` for descriptions, identifiers, platforms, status,
+external references, version/timestamps, and available `log_source_references`,
+`log_sources`, and `mutable_elements`. Response-level `metadata.subject_entity`
+contains the subject's authored content. Item metadata also includes directed
+`source_canonical_id`, `target_canonical_id`, and `source_refs`. Preserve
+`metadata.warnings`, including missing references, in your conclusions.
+
+These are authored technique-level links, not observed procedure execution.
+The ATT&CK item `score` of `1.0` is not detection effectiveness or threat
+probability, and `evidence_count` counts provenance references, not executions.
+For a detection engineering handoff, cite the source guidance and separate your
+own proposed emulation or detection steps. `no_relationships` means no matching
+links in the available dataset; it does not mean a technique is undetectable.
 
 ### Batch envelopes
 

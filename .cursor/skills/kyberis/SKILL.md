@@ -1,6 +1,6 @@
 ---
 name: kyberis
-description: Guides Cursor Agent mode to query Kyberis through MCP or API, resolve entities, look up evidence, find relationships, prioritize threats, run structured assessments, and produce security recommendations. Use when users ask for Kyberis, threat lookup, incident investigations, evidence lookup, entity resolution, relationship pivots, IOC/CVE/actor assessment, environment prioritization, or remediation guidance.
+description: Guides Cursor Agent mode to query Kyberis through MCP or API, resolve entities, look up evidence, find relationships and ATT&CK detection knowledge, prioritize threats, run structured assessments, and produce security recommendations. Use when users ask for Kyberis, threat lookup, incident investigations, evidence lookup, entity resolution, relationship pivots and ATT&CK detection guidance, IOC/CVE/actor assessment, environment prioritization, or remediation guidance.
 ---
 
 # Kyberis Cursor Skill
@@ -38,6 +38,8 @@ Use this sequence unless the user asks for a narrower path.
 
 ## Trigger Classification
 
+- ATT&CK technique/detection/telemetry question: follow the ATT&CK detection guidance below.
+
 - Raw entity or indicator: start with entity resolution. Examples: CVE, IP, domain, URL, hash, actor alias, malware name.
 - Broad topic or news question: start with intel search, then resolve material entities before evidence and assessment.
 - Environment or posture question: start with prioritization or environment assessment, then validate top findings with evidence and relationships.
@@ -51,7 +53,7 @@ Natural user phrasing that should trigger this skill includes `Kyberis lookup`, 
 - `entity-resolution`: normalize alias-like, ambiguous, typo-prone, or mixed-format input before downstream calls.
 - `intel-search`: discover relevant report capsules for broad topic/news questions.
 - `evidence`: prove or disprove concrete claims such as exploitation, targeting, actor association, campaign association, malware association, environmental relevance, or observed IOC activity.
-- `relationships`: pivot from a subject to related actors, campaigns, malware, sectors, IoCs, or CVE exploitation techniques.
+- `relationships`: pivot from a subject to related actors, campaigns, malware, sectors, IoCs, CVE exploitation techniques, or authored ATT&CK detection and telemetry knowledge.
 - `cve-assessments`: use when the subject is primarily a CVE.
 - `actor-assessments`: use when the subject is a threat actor.
 - `ioc-assessments`: use when the subject is an IOC and exact-string fidelity matters.
@@ -67,7 +69,7 @@ Natural user phrasing that should trigger this skill includes `Kyberis lookup`, 
 - Evidence, relationships, and assessments accept exactly one of `subject` or `query`.
 - Prefer `subject` when a canonical ID is already known.
 - Prefer exact `query` mode for IOC investigations, especially URLs and observables where normalization can lose feed fidelity.
-- Supported concrete entity types are `actor`, `campaign`, `cve`, `domain`, `email`, `hash`, `ip`, `malware`, and `url`.
+- Entity resolution accepts `technique` alongside the existing concrete entity types (`actor`, `campaign`, `cve`, `domain`, `email`, `hash`, `ip`, `malware`, `url`). Relationships also accept `tactic`, `detection-strategy`, `analytic`, `data-component`, and `data-source` as subjects and expected types. Check endpoint-specific types before assessment or hydration calls.
 - Do not use `ioc` in `expected_types`; expand IOC intent to concrete types.
 - Bound all result sizes and batch sizes according to `references/api-reference.md`.
 
@@ -90,6 +92,25 @@ curl -s -X POST "$KYBERIS_BASE_URL/v2/entity-resolution" \
     "resolution": {"max_results": 5}
   }' | jq .
 ```
+
+## ATT&CK detection guidance
+
+For technique, detection, or telemetry questions, use `relationships` directly
+with an exact ATT&CK ID (for example `T1059.001`) and explicit ATT&CK targets or
+predicates. Technique IDs are techniques, not domains. Use
+`expected_types: ["technique"]` when resolving a technique separately.
+
+From a technique, request incoming `detects` links to `detection-strategy`, then
+outgoing `has_analytic` links to `analytic`, `requires_data_component` links to
+`data-component`, and `belongs_to_data_source` links to `data-source` where
+available. Use outgoing `belongs_to` for technique-to-tactic membership. Reuse
+returned canonical IDs and keep actor/IOC pivots in separate requests.
+
+Read [ATT&CK traversal](references/api-reference.md#attck-detection-and-telemetry-traversal)
+for request examples, filters, pagination, and response fields. Use authored
+content and citations for a detection engineering handoff; do not present it as
+observed procedure execution or a generated emulation script. These new entity
+types do not imply support in assessment or generic hydration endpoints.
 
 ## CVE Decision Boundaries
 

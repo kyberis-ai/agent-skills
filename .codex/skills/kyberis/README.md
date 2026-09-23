@@ -98,3 +98,10 @@ At minimum, return:
 - For IOC evidence and IOC assessment calls, subject-mode requests must include `subject.canonical_name`; otherwise use exact `query` mode.
 - For IOC evidence (`observed_in_the_wild`) and IOC assessment, the client auto-retries once in exact `query` mode when subject-mode indicates `no_match`/`no_evidence`.
 - See `references/api-reference.md` for limits and controlled vocabularies.
+
+## ATT&CK detection guidance
+
+Use `relationships` with incoming `detects` links to find detection strategies
+for a technique, then traverse analytics and telemetry with outgoing links.
+See [ATT&CK traversal](references/api-reference.md#attck-detection-and-telemetry-traversal)
+for the PowerShell example, exact fields, and response interpretation.
