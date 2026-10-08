@@ -62,8 +62,32 @@ body. Minimum fields:
 
 Optional fields: `parent_step_id`, `priority`, `constraints` (latency budget,
 min resolution confidence, max results, strict mode), `tags`, `client`
-(agent name/version/framework). For batch endpoints, top-level `agent_context`
+(agent name/version/framework), and `skill` (self-reported ID/version). For batch endpoints, top-level `agent_context`
 is required and is propagated to items when per-item context is omitted.
+
+### Optional attribution metadata
+
+Use `agent_context.client.agent_name` for a truthful calling-agent name. When you
+are executing an installed skill and its request schema supports the field, send
+`agent_context.skill.id` for that skill (for this skill, `kyberis`). Include
+`skill.version` only when you know the installed version. Do not invent names,
+versions, verified identities, or detection outcomes. Omit unknown optional fields.
+Skill ID length is 1–128 characters; version length is 1–64. Values are trimmed,
+control characters are rejected, and the skill object accepts only `id` and `version`.
+
+GET entity/evidence hydration uses `X-Agent-Client` and `X-Agent-Skill` JSON headers
+for these optional objects, alongside the required `X-Agent-*` context headers.
+These labels do not grant access or declare transport.
+
+`GET /v2/attribution/flow` (`read:intel`) reports feed contributions separately from
+unique recorded API responses. It is optional diagnostics, not a required step in
+an investigation. `agent_key_type: "api_key"` identifies a historical credential
+fallback; `agent_key` is the immutable key ID and optional `api_key_name` is its
+current display name. Duplicate names do not imply the same key, and a shared key
+does not identify one agent. A principal fallback is not an agent identity. Missing
+transport/skill metadata remains unknown. Never interpret these counts as confirmed
+detections or complete activity coverage. Do not require newer additive response
+fields when consuming older deployments.
 
 ## Endpoint Reference
 

@@ -126,3 +126,12 @@ When showing results to the user:
 - Include 1-3 concrete next actions.
 - For missing Kyberis context, provide the exact MCP/API setup step rather than a pretend result.
 - For partial failures, state which step or item failed and whether the recommendation still stands.
+
+## Attribution metadata
+
+When the request schema supports it, identify the calling agent truthfully with
+`agent_context.client.agent_name`. While using this skill, optionally report
+`agent_context.skill.id` as `kyberis`; include a version only if you know the
+installed version. These fields are self-reported. Do not infer an agent identity
+from a principal ID or an API key name, and do not invent metadata. See the shared
+API reference for field limits, GET headers, and historical attribution caveats.

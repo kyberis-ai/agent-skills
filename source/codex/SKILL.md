@@ -209,3 +209,12 @@ Use `node .codex/skills/kyberis/bin/kyberis-client.mjs --help` for command synta
 ## Reference
 
 - `references/api-reference.md`: endpoint contract matrix, scopes, limits, controlled vocabularies, hydration headers, batch notes, and operational gotchas.
+
+## Attribution metadata
+
+When the request schema supports it, identify the calling agent truthfully with
+`agent_context.client.agent_name`. While using this skill, optionally report
+`agent_context.skill.id` as `kyberis`; include a version only if you know the
+installed version. These fields are self-reported. Do not infer an agent identity
+from a principal ID or an API key name, and do not invent metadata. See the shared
+API reference for field limits, GET headers, and historical attribution caveats.
