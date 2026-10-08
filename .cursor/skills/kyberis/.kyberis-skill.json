@@ -1,6 +1,6 @@
 {
   "package": "@kyberis-ai/agent-skills",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "skill": "kyberis",
   "agent": "cursor",
   "contentHash": "sha256:5106e04979ddc95cdd7ccf9184adb8cb83f42c50ad034ee4c701fadaeedb171e"
