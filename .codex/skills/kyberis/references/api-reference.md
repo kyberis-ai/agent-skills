@@ -83,7 +83,9 @@ These labels do not grant access or declare transport.
 unique recorded API responses. It is optional diagnostics, not a required step in
 an investigation. `agent_key_type: "api_key"` identifies a historical credential
 fallback; `agent_key` is the immutable key ID and optional `api_key_name` is its
-current display name. Duplicate names do not imply the same key, and a shared key
+current display name. Optional `api_key_revoked` is true if that key row is missing,
+false if it exists, and null for other identities. A missing name alone does not
+prove revocation. Duplicate names do not imply the same key, and a shared key
 does not identify one agent. A principal fallback is not an agent identity. Missing
 transport/skill metadata remains unknown. Never interpret these counts as confirmed
 detections or complete activity coverage. Do not require newer additive response
