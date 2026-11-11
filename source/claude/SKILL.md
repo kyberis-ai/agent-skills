@@ -195,3 +195,11 @@ When the request schema supports it, identify the calling agent truthfully with
 installed version. These fields are self-reported. Do not infer an agent identity
 from a principal ID or an API key name, and do not invent metadata. See the shared
 API reference for field limits, GET headers, and historical attribution caveats.
+
+
+## Campaign response interpretation
+
+For campaign context in assessments or relationship pivots, read
+[Campaign context and compact relationships](references/api-reference.md#campaign-context-and-compact-relationships).
+Use the full campaign already returned instead of expecting a repeated
+`metadata.campaign` on each relationship; preserve truncation and historical-activity caveats.
