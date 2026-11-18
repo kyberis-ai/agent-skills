@@ -678,3 +678,36 @@ When showing results to the user:
 - The api-keys endpoints take a Bearer OIDC token, not an ApiKey. They
   are out of scope for agent flows. Use the dashboard to mint keys.
 - OpenAPI: if you need a machine-readable contract snapshot, ask for the generated Kyberis API OpenAPI artifact.
+
+
+## Campaign context and compact relationships
+
+Assessments return full campaign records once in
+`metadata.campaign_context.campaigns`, with descriptions, references, activity
+dates, lifecycle status, and bounded relationships. This applies to actor,
+threat, environment, and attributed IOC assessments, including batch results.
+Each nested relationship identifies its containing campaign through
+`metadata.source_canonical_id`; do not expect a repeated `metadata.campaign`.
+
+For MITRE campaign links, `metadata.source_canonical_id` identifies the campaign
+and `metadata.target_canonical_id` identifies the linked actor, malware, or
+technique regardless of traversal direction. `metadata.entity` contains the
+traversal target: the full campaign for incoming campaign links, or the linked
+entity for outgoing links. Preserve `metadata.relationship_predicate` and
+`metadata.source_refs` when reporting evidence.
+
+If you previously read `metadata.campaign`, use the containing assessment
+campaign or incoming relationship's `metadata.entity`. If campaign subject
+details are missing and needed, call entity resolution with the returned
+canonical ID as `query`, `expected_types: ["campaign"]`, and
+`resolution: {"include_metadata": true}`. Read the matching candidate's
+`metadata`. Do not add a lookup when the current response already contains
+the details needed to answer the question.
+
+Campaign context is bounded to 10 campaigns and 50 relationships per campaign.
+Check `campaign_context.truncated` and each campaign's
+`relationships_truncated`; missing context does not prove no associations exist.
+Preserve partial findings and use bounded relationship pivots only when needed.
+Historical campaign associations and dates do not establish current activity:
+`activity_status` remains `unknown`, and this context does not increase assessment
+risk or confidence. Keep lifecycle status, references, caveats, and uncertainty.
